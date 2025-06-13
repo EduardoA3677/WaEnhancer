@@ -110,6 +110,9 @@ public class FeatureLoader {
 
     public static void start(@NonNull ClassLoader loader, @NonNull XSharedPreferences pref, String sourceDir) {
 
+        // Initialize LSPatch compatibility layer
+        initializeLSPatchCompatibility(pref);
+
         if (!Unobfuscator.initWithPath(sourceDir)) {
             XposedBridge.log("Can't init dexkit");
             return;
@@ -196,6 +199,57 @@ public class FeatureLoader {
                 }
             }
         });
+    }    /**
+     * Initialize LSPatch compatibility layer for WaEnhancer
+     * @param pref Shared preferences instance
+     */
+    private static void initializeLSPatchCompatibility(@NonNull XSharedPreferences pref) {
+        try {
+            // Initialize LSPatch compatibility
+            LSPatchCompat.init();
+            
+            if (LSPatchCompat.isLSPatchEnvironment()) {
+                XposedBridge.log("[WaEnhancer] Running in LSPatch mode: " + LSPatchCompat.getLSPatchMode());
+                
+                // Initialize LSPatch bridge if possible
+                if (mApp != null) {
+                    boolean bridgeInitialized = LSPatchBridge.initialize(mApp);
+                    if (bridgeInitialized) {
+                        XposedBridge.log("[WaEnhancer] LSPatch bridge initialized successfully");
+                    } else {
+                        XposedBridge.log("[WaEnhancer] LSPatch bridge initialization failed");
+                    }
+                    
+                    // Load LSPatch configuration
+                    if (LSPatchConfig.loadConfig(mApp)) {
+                        XposedBridge.log("[WaEnhancer] LSPatch configuration loaded");
+                        LSPatchConfig.logConfig();
+                    }
+                }
+                
+                // Apply LSPatch specific configurations
+                if (LSPatchCompat.isFeatureAvailable("SIGNATURE_BYPASS")) {
+                    XposedBridge.log("[WaEnhancer] LSPatch signature bypass available");
+                }
+                
+                if (!LSPatchCompat.isFeatureAvailable("RESOURCE_HOOKS")) {
+                    XposedBridge.log("[WaEnhancer] Warning: Resource hooks not available in current LSPatch mode");
+                }
+                
+                if (!LSPatchCompat.isFeatureAvailable("SYSTEM_SERVER_HOOKS")) {
+                    XposedBridge.log("[WaEnhancer] Note: System server hooks not available in LSPatch");
+                }
+                
+                // Optimize hook stability for LSPatch
+                LSPatchCompat.optimizeForLSPatch();
+                
+            } else {
+                XposedBridge.log("[WaEnhancer] Running in classic Xposed mode");
+            }
+            
+        } catch (Exception e) {
+            XposedBridge.log("[WaEnhancer] Error initializing LSPatch compatibility: " + e.getMessage());
+        }
     }
 
     private static void disableExpirationVersion(ClassLoader classLoader) {

@@ -48,6 +48,12 @@ android {
         multiDexEnabled = true
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        
+        // LSPatch compatibility metadata
+        buildConfigField("boolean", "LSPATCH_COMPATIBLE", "true")
+        buildConfigField("String", "LSPATCH_MIN_VERSION", "\"0.6\"")
+        buildConfigField("String", "XPOSED_MIN_API", "\"54\"")
+        buildConfigField("String", "XPOSED_TARGET_API", "\"82\"")
 
         signingConfigs.create("config") {
             val androidStoreFile = project.findProperty("androidStoreFile") as String?

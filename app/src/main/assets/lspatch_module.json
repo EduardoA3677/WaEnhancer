@@ -1,0 +1,31 @@
+{
+  "name": "WaEnhancer",
+  "description": "WhatsApp enhancer module with LSPatch support",
+  "author": "wmods",
+  "version": "1.5.0",
+  "lspatch": {
+    "supported": true,
+    "minVersion": "0.6",
+    "targetSdk": 34,
+    "features": {
+      "signature_bypass": true,
+      "resource_hooks": true,
+      "embedded_mode": true,
+      "manager_mode": true
+    },
+    "optimizations": {
+      "hook_stability": true,
+      "memory_conservative": true,
+      "error_recovery": true
+    },
+    "compatibility": {
+      "whatsapp": "2.23.25.xx",
+      "business": "2.23.25.xx"
+    }
+  },
+  "xposed": {
+    "api": 82,
+    "minApi": 54,
+    "targetPackages": ["com.whatsapp", "com.whatsapp.w4b"]
+  }
+}

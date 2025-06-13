@@ -13,6 +13,8 @@ import com.wmods.wppenhacer.activities.MainActivity;
 import com.wmods.wppenhacer.xposed.AntiUpdater;
 import com.wmods.wppenhacer.xposed.bridge.ScopeHook;
 import com.wmods.wppenhacer.xposed.core.FeatureLoader;
+import com.wmods.wppenhacer.xposed.core.LSPatchCompat;
+import com.wmods.wppenhacer.xposed.core.LSPatchPreferences;
 import com.wmods.wppenhacer.xposed.downgrade.Patch;
 import com.wmods.wppenhacer.xposed.spoofer.HookBL;
 import com.wmods.wppenhacer.xposed.utils.ResId;
@@ -30,18 +32,24 @@ import de.robv.android.xposed.callbacks.XC_LoadPackage;
 
 public class WppXposed implements IXposedHookLoadPackage, IXposedHookInitPackageResources, IXposedHookZygoteInit {
 
-    private static XSharedPreferences pref;
+    private static LSPatchPreferences pref;
     private String MODULE_PATH;
     public static XC_InitPackageResources.InitPackageResourcesParam ResParam;
 
     @NonNull
-    public static XSharedPreferences getPref() {
+    public static LSPatchPreferences getPref() {
         if (pref == null) {
-            pref = new XSharedPreferences(BuildConfig.APPLICATION_ID, BuildConfig.APPLICATION_ID + "_preferences");
-            pref.makeWorldReadable();
-            pref.reload();
+            XSharedPreferences xprefs = new XSharedPreferences(BuildConfig.APPLICATION_ID, BuildConfig.APPLICATION_ID + "_preferences");
+            xprefs.makeWorldReadable();
+            xprefs.reload();
+            pref = new LSPatchPreferences(xprefs);
         }
         return pref;
+    }
+
+    @NonNull
+    public static XSharedPreferences getXPref() {
+        return getPref().getXSharedPreferences();
     }
 
     @SuppressLint("WorldReadableFiles")
@@ -58,7 +66,7 @@ public class WppXposed implements IXposedHookLoadPackage, IXposedHookInitPackage
 
         AntiUpdater.hookSession(lpparam);
 
-        Patch.handleLoadPackage(lpparam, getPref());
+        Patch.handleLoadPackage(lpparam, getXPref());
 
         ScopeHook.hook(lpparam);
 
@@ -66,8 +74,26 @@ public class WppXposed implements IXposedHookLoadPackage, IXposedHookInitPackage
         if ((packageName.equals(FeatureLoader.PACKAGE_WPP) && App.isOriginalPackage()) || packageName.equals(FeatureLoader.PACKAGE_BUSINESS)) {
             XposedBridge.log("[•] This package: " + lpparam.packageName);
 
-            // Load features
-            FeatureLoader.start(classLoader, getPref(), lpparam.appInfo.sourceDir);
+            // Initialize LSPatch compatibility first
+            LSPatchCompat.init();
+            if (LSPatchCompat.isLSPatchEnvironment()) {
+                XposedBridge.log("[LSPatch] Running in LSPatch mode: " + LSPatchCompat.getLSPatchMode());
+                
+                // Apply LSPatch specific setup
+                if (LSPatchCompat.getLSPatchMode() == LSPatchCompat.LSPatchMode.LSPATCH_EMBEDDED) {
+                    XposedBridge.log("[LSPatch] Using embedded mode optimizations");
+                } else if (LSPatchCompat.getLSPatchMode() == LSPatchCompat.LSPatchMode.LSPATCH_MANAGER) {
+                    XposedBridge.log("[LSPatch] Using manager mode with bridge service");
+                }
+                
+                // Check feature availability
+                if (!LSPatchCompat.isFeatureAvailable("RESOURCE_HOOKS")) {
+                    XposedBridge.log("[LSPatch] Warning: Resource hooks may not work properly");
+                }
+            }
+
+            // Load features with LSPatch compatibility
+            FeatureLoader.start(classLoader, getXPref(), lpparam.appInfo.sourceDir);
 
             disableSecureFlag();
         }
@@ -80,24 +106,36 @@ public class WppXposed implements IXposedHookLoadPackage, IXposedHookInitPackage
         if (!packageName.equals(FeatureLoader.PACKAGE_WPP) && !packageName.equals(FeatureLoader.PACKAGE_BUSINESS))
             return;
 
+        // Check if resource hooks are available in LSPatch
+        if (LSPatchCompat.isLSPatchEnvironment() && !LSPatchCompat.isFeatureAvailable("RESOURCE_HOOKS")) {
+            XposedBridge.log("[LSPatch] Resource hooks not available, skipping resource initialization");
+            return;
+        }
+
         XModuleResources modRes = XModuleResources.createInstance(MODULE_PATH, resparam.res);
         ResParam = resparam;
 
-        for (var field : ResId.string.class.getFields()) {
-            var field1 = R.string.class.getField(field.getName());
-            field.set(null, resparam.res.addResource(modRes, field1.getInt(null)));
-        }
+        try {
+            for (var field : ResId.string.class.getFields()) {
+                var field1 = R.string.class.getField(field.getName());
+                field.set(null, resparam.res.addResource(modRes, field1.getInt(null)));
+            }
 
-        for (var field : ResId.array.class.getFields()) {
-            var field1 = R.array.class.getField(field.getName());
-            field.set(null, resparam.res.addResource(modRes, field1.getInt(null)));
-        }
+            for (var field : ResId.array.class.getFields()) {
+                var field1 = R.array.class.getField(field.getName());
+                field.set(null, resparam.res.addResource(modRes, field1.getInt(null)));
+            }
 
-        for (var field : ResId.drawable.class.getFields()) {
-            var field1 = R.drawable.class.getField(field.getName());
-            field.set(null, resparam.res.addResource(modRes, field1.getInt(null)));
+            for (var field : ResId.drawable.class.getFields()) {
+                var field1 = R.drawable.class.getField(field.getName());
+                field.set(null, resparam.res.addResource(modRes, field1.getInt(null)));
+            }
+        } catch (Exception e) {
+            XposedBridge.log("[WaEnhancer] Error setting up resources: " + e.getMessage());
+            if (LSPatchCompat.isLSPatchEnvironment()) {
+                XposedBridge.log("[LSPatch] Resource error might be due to LSPatch limitations");
+            }
         }
-
     }
 
     @Override

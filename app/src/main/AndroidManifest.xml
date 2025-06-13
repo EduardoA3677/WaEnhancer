@@ -115,6 +115,29 @@
         <meta-data
             android:name="xposedscope"
             android:resource="@array/scope" />
+        
+        <!-- LSPatch compatibility metadata -->
+        <meta-data
+            android:name="lspatch"
+            android:value="true" />
+        <meta-data
+            android:name="lspatch_compatible"
+            android:value="true" />
+        <meta-data
+            android:name="lspatch_min_version"
+            android:value="0.6" />
+        <meta-data
+            android:name="lspatch_supports_embedded"
+            android:value="true" />
+        <meta-data
+            android:name="lspatch_supports_manager"
+            android:value="true" />
+        <meta-data
+            android:name="lspatch_signature_bypass"
+            android:value="true" />
+        <meta-data
+            android:name="lspatch_resource_hooks"
+            android:value="true" />
 
         <receiver
             android:name=".receivers.WAFReceiver"
