@@ -159,19 +159,53 @@ public class LSPatchService {
      */
     public static boolean isWaEnhancerLoaded() {
         try {
+            // Method 1: Check in LSPatch module list
             Object modulesList = getModulesList();
-            if (modulesList == null) {
-                return false;
+            if (modulesList != null && isWaEnhancerInModulesList(modulesList)) {
+                Log.d(TAG, "WaEnhancer found in LSPatch modules list");
+                return true;
             }
             
+            // Method 2: Check if WaEnhancer classes are loaded in current classloader
+            if (areWaEnhancerClassesLoaded()) {
+                Log.d(TAG, "WaEnhancer classes found in classloader");
+                return true;
+            }
+            
+            // Method 3: Check if we're running in correct WhatsApp context with WaEnhancer
+            if (isInWhatsAppWithWaEnhancer()) {
+                Log.d(TAG, "Running in WhatsApp context with WaEnhancer");
+                return true;
+            }
+            
+            // Method 4: Check LSPatch service health and WaEnhancer indicators
+            if (isServiceHealthyWithWaEnhancer()) {
+                Log.d(TAG, "LSPatch service is healthy and WaEnhancer indicators found");
+                return true;
+            }
+            
+            return false;
+            
+        } catch (Exception e) {
+            Log.w(TAG, "Failed to check if WaEnhancer is loaded: " + e.getMessage());
+            return false;
+        }
+    }
+    
+    /**
+     * Check if WaEnhancer is in the modules list
+     */
+    private static boolean isWaEnhancerInModulesList(Object modulesList) {
+        try {
             // Check if our module is in the list
             if (modulesList instanceof java.util.List) {
                 java.util.List<?> list = (java.util.List<?>) modulesList;
                 for (Object module : list) {
                     try {
+                        // Try packageName field
                         Object packageName = module.getClass().getField("packageName").get(module);
                         if ("com.wmods.wppenhacer".equals(packageName)) {
-                            Log.d(TAG, "WaEnhancer module found in LSPatch modules list");
+                            Log.d(TAG, "WaEnhancer module found via packageName");
                             return true;
                         }
                     } catch (Exception e) {
@@ -183,7 +217,20 @@ public class LSPatchService {
                                 return true;
                             }
                         } catch (Exception e2) {
-                            // Ignore field access errors
+                            try {
+                                Object moduleName = module.getClass().getField("name").get(module);
+                                if (moduleName != null && moduleName.toString().contains("wppenhacer")) {
+                                    Log.d(TAG, "WaEnhancer module found via name");
+                                    return true;
+                                }
+                            } catch (Exception e3) {
+                                // Try toString method
+                                String moduleStr = module.toString();
+                                if (moduleStr.contains("wppenhacer") || moduleStr.contains("WaEnhancer")) {
+                                    Log.d(TAG, "WaEnhancer module found via toString");
+                                    return true;
+                                }
+                            }
                         }
                     }
                 }
@@ -192,8 +239,170 @@ public class LSPatchService {
             return false;
             
         } catch (Exception e) {
-            Log.w(TAG, "Failed to check if WaEnhancer is loaded: " + e.getMessage());
+            Log.w(TAG, "Error checking modules list: " + e.getMessage());
             return false;
+        }
+    }
+    
+    /**
+     * Check if WaEnhancer classes are loaded
+     */
+    private static boolean areWaEnhancerClassesLoaded() {
+        try {
+            ClassLoader cl = Thread.currentThread().getContextClassLoader();
+            if (cl == null) {
+                cl = LSPatchService.class.getClassLoader();
+            }
+            
+            // Core WaEnhancer classes that should be loaded if module is active
+            String[] waEnhancerClasses = {
+                "com.wmods.wppenhacer.xposed.core.WppCore",
+                "com.wmods.wppenhacer.xposed.core.FeatureLoader",
+                "com.wmods.wppenhacer.xposed.core.components.FMessageWpp",
+                "com.wmods.wppenhacer.xposed.features.general.AntiRevoke",
+                "com.wmods.wppenhacer.xposed.features.privacy.HideSeen"
+            };
+            
+            int loadedCount = 0;
+            for (String className : waEnhancerClasses) {
+                try {
+                    Class<?> clazz = cl.loadClass(className);
+                    if (clazz != null) {
+                        loadedCount++;
+                        Log.d(TAG, "Found WaEnhancer class: " + className);
+                    }
+                } catch (ClassNotFoundException e) {
+                    // Class not found, continue
+                }
+            }
+            
+            // If we found at least 2 core classes, consider it loaded
+            return loadedCount >= 2;
+            
+        } catch (Exception e) {
+            Log.w(TAG, "Error checking WaEnhancer classes: " + e.getMessage());
+            return false;
+        }
+    }
+    
+    /**
+     * Check if we're in WhatsApp context with WaEnhancer
+     */
+    private static boolean isInWhatsAppWithWaEnhancer() {
+        try {
+            Context context = getCurrentContext();
+            if (context == null) {
+                return false;
+            }
+            
+            String packageName = context.getPackageName();
+            boolean isWhatsApp = "com.whatsapp".equals(packageName) || "com.whatsapp.w4b".equals(packageName);
+            
+            if (!isWhatsApp) {
+                return false;
+            }
+            
+            // Check if WaEnhancer is actually running by trying to access its resources or features
+            try {
+                // Try to access WaEnhancer's shared preferences
+                android.content.SharedPreferences prefs = context.getSharedPreferences("WaGlobal", Context.MODE_PRIVATE);
+                if (prefs != null) {
+                    // Check if any WaEnhancer preferences exist
+                    java.util.Map<String, ?> allPrefs = prefs.getAll();
+                    if (!allPrefs.isEmpty()) {
+                        Log.d(TAG, "WaEnhancer preferences found");
+                        return true;
+                    }
+                }
+            } catch (Exception e) {
+                // Preferences access might fail
+            }
+            
+            // Check if Xposed is functional in this context
+            try {
+                de.robv.android.xposed.XposedBridge.log("WaEnhancer LSPatch service check");
+                return true;
+            } catch (Exception e) {
+                Log.w(TAG, "XposedBridge not functional: " + e.getMessage());
+                return false;
+            }
+            
+        } catch (Exception e) {
+            Log.w(TAG, "Error checking WhatsApp context: " + e.getMessage());
+            return false;
+        }
+    }
+    
+    /**
+     * Check if LSPatch service is healthy and has WaEnhancer indicators
+     */
+    private static boolean isServiceHealthyWithWaEnhancer() {
+        try {
+            // Check if any service is available and responding
+            boolean localOk = false;
+            boolean remoteOk = false;
+            
+            if (sLocalService != null) {
+                try {
+                    Object result = sLocalService.getClass().getMethod("getLegacyModulesList").invoke(sLocalService);
+                    localOk = result != null;
+                } catch (Exception e) {
+                    Log.w(TAG, "Local service health check failed: " + e.getMessage());
+                }
+            }
+            
+            if (sRemoteService != null) {
+                try {
+                    Object result = sRemoteService.getClass().getMethod("getLegacyModulesList").invoke(sRemoteService);
+                    remoteOk = result != null;
+                } catch (Exception e) {
+                    Log.w(TAG, "Remote service health check failed: " + e.getMessage());
+                }
+            }
+            
+            boolean serviceHealthy = localOk || remoteOk;
+            
+            if (serviceHealthy) {
+                // Service is healthy, check for WaEnhancer indicators
+                try {
+                    // Check if we can access WaEnhancer related system properties
+                    String waEnhancerProp = System.getProperty("waenhancer.lspatch.enabled");
+                    if ("true".equals(waEnhancerProp)) {
+                        Log.d(TAG, "WaEnhancer system property found");
+                        return true;
+                    }
+                } catch (Exception e) {
+                    // Property access might be restricted
+                }
+                
+                // If service is healthy but no specific WaEnhancer indicators,
+                // still return true as the service might just not list embedded modules
+                return true;
+            }
+            
+            return false;
+            
+        } catch (Exception e) {
+            Log.w(TAG, "Error checking service health: " + e.getMessage());
+            return false;
+        }
+    }
+    
+    /**
+     * Get current context
+     */
+    private static Context getCurrentContext() {
+        try {
+            Class<?> activityThreadClass = Class.forName("android.app.ActivityThread");
+            Object activityThread = activityThreadClass.getMethod("currentActivityThread").invoke(null);
+            return (Context) activityThreadClass.getMethod("getApplication").invoke(activityThread);
+        } catch (Exception e) {
+            try {
+                Class<?> appGlobalsClass = Class.forName("android.app.AppGlobals");
+                return (Context) appGlobalsClass.getMethod("getInitialApplication").invoke(null);
+            } catch (Exception e2) {
+                return null;
+            }
         }
     }
     

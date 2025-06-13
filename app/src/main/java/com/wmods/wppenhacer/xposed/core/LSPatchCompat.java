@@ -7,6 +7,7 @@ import de.robv.android.xposed.XposedBridge;
 
 import java.io.File;
 import java.lang.reflect.Method;
+import java.util.List;
 
 /**
  * LSPatch Compatibility Layer for WaEnhancer
@@ -346,57 +347,138 @@ public class LSPatchCompat {
     }
     
     private static LSPatchMode detectLSPatchMode() {
-        // Check for manager mode first (RemoteApplicationService)
+        // Enhanced mode detection with multiple methods
+        
+        // Method 1: Check for manager mode first (RemoteApplicationService)
         if (isClassAvailable("org.lsposed.lspatch.service.RemoteApplicationService")) {
+            Log.d(TAG, "RemoteApplicationService detected - Manager Mode");
             return LSPatchMode.LSPATCH_MANAGER;
         }
         
-        // Check for embedded mode (LocalApplicationService) 
+        // Method 2: Check for embedded mode (LocalApplicationService) 
         if (isClassAvailable("org.lsposed.lspatch.service.LocalApplicationService")) {
+            Log.d(TAG, "LocalApplicationService detected - Embedded Mode");
             return LSPatchMode.LSPATCH_EMBEDDED;
         }
         
-        // Check for LSPatch meta loader (indicates patched APK - embedded mode)
+        // Method 3: Check for LSPatch meta loader (indicates patched APK - embedded mode)
         if (isClassAvailable(LSPATCH_METALOADER_CLASS)) {
+            Log.d(TAG, "LSPatch MetaLoader detected - Embedded Mode");
             return LSPatchMode.LSPATCH_EMBEDDED;
         }
         
-        // Check for LSPatch loader (embedded mode)
+        // Method 4: Check for LSPatch loader (embedded mode)
         if (isClassAvailable(LSPATCH_LOADER_CLASS)) {
+            Log.d(TAG, "LSPatch Loader detected - Embedded Mode");
             return LSPatchMode.LSPATCH_EMBEDDED;
         }
         
-        // Check system properties for mode detection
+        // Method 5: Check system properties for mode detection
         try {
             String managerPackage = System.getProperty("lspatch.manager.package");
             if ("org.lsposed.lspatch".equals(managerPackage)) {
+                Log.d(TAG, "Manager package property detected - Manager Mode");
                 return LSPatchMode.LSPATCH_MANAGER;
             }
             
             String embeddedMode = System.getProperty("lspatch.embedded");
             if ("true".equals(embeddedMode)) {
+                Log.d(TAG, "Embedded property detected - Embedded Mode");
                 return LSPatchMode.LSPATCH_EMBEDDED;
             }
             
             String managerMode = System.getProperty("lspatch.manager");
             if ("true".equals(managerMode)) {
+                Log.d(TAG, "Manager property detected - Manager Mode");
+                return LSPatchMode.LSPATCH_MANAGER;
+            }
+            
+            String lspatchMode = System.getProperty("lspatch.mode");
+            if ("embedded".equals(lspatchMode)) {
+                Log.d(TAG, "Mode property embedded detected - Embedded Mode");
+                return LSPatchMode.LSPATCH_EMBEDDED;
+            } else if ("manager".equals(lspatchMode)) {
+                Log.d(TAG, "Mode property manager detected - Manager Mode");
                 return LSPatchMode.LSPATCH_MANAGER;
             }
         } catch (Exception e) {
-            // Property access might be restricted
+            Log.d(TAG, "Property access error: " + e.getMessage());
         }
         
-        // Check for embedded modules in assets (indicates embedded mode)
+        // Method 6: Check for embedded modules in assets (indicates embedded mode)
         try {
-            ClassLoader cl = Thread.currentThread().getContextClassLoader();
-            if (cl != null && cl.getResource("assets/lspatch/modules") != null) {
-                return LSPatchMode.LSPATCH_EMBEDDED;
+            Context context = getCurrentContext();
+            if (context != null) {
+                // Check for LSPatch embedded modules
+                try {
+                    String[] modules = context.getAssets().list("lspatch/modules");
+                    if (modules != null && modules.length > 0) {
+                        Log.d(TAG, "Embedded modules detected - Embedded Mode");
+                        return LSPatchMode.LSPATCH_EMBEDDED;
+                    }
+                } catch (Exception e) {
+                    // Assets might not exist
+                }
+                
+                // Check for LSPatch configuration that indicates mode
+                try {
+                    java.io.InputStream configStream = context.getAssets().open("lspatch/config.json");
+                    java.util.Scanner scanner = new java.util.Scanner(configStream).useDelimiter("\\A");
+                    String config = scanner.hasNext() ? scanner.next() : "";
+                    configStream.close();
+                    
+                    if (config.contains("\"embedded\":true") || config.contains("\"mode\":\"embedded\"")) {
+                        Log.d(TAG, "Config indicates embedded mode - Embedded Mode");
+                        return LSPatchMode.LSPATCH_EMBEDDED;
+                    } else if (config.contains("\"manager\":true") || config.contains("\"mode\":\"manager\"")) {
+                        Log.d(TAG, "Config indicates manager mode - Manager Mode");
+                        return LSPatchMode.LSPATCH_MANAGER;
+                    }
+                } catch (Exception e) {
+                    // Config file might not exist or be readable
+                }
             }
         } catch (Exception e) {
-            // Resource access might fail
+            Log.d(TAG, "Context access error: " + e.getMessage());
+        }
+        
+        // Method 7: Check classloader hierarchy for LSPatch indicators
+        try {
+            ClassLoader cl = Thread.currentThread().getContextClassLoader();
+            String clString = cl.toString();
+            
+            if (clString.contains("lspatch") || clString.contains("LSPatch")) {
+                if (clString.contains("embedded") || clString.contains("local")) {
+                    Log.d(TAG, "ClassLoader indicates embedded mode - Embedded Mode");
+                    return LSPatchMode.LSPATCH_EMBEDDED;
+                } else if (clString.contains("manager") || clString.contains("remote")) {
+                    Log.d(TAG, "ClassLoader indicates manager mode - Manager Mode");
+                    return LSPatchMode.LSPATCH_MANAGER;
+                }
+            }
+        } catch (Exception e) {
+            Log.d(TAG, "ClassLoader check error: " + e.getMessage());
+        }
+        
+        // Method 8: Check for LSPatch process name patterns
+        try {
+            String processName = getCurrentProcessName();
+            if (processName != null) {
+                if (processName.contains("lspatch") && processName.contains("embedded")) {
+                    Log.d(TAG, "Process name indicates embedded mode - Embedded Mode");
+                    return LSPatchMode.LSPATCH_EMBEDDED;
+                } else if (processName.contains("lspatch") && processName.contains("manager")) {
+                    Log.d(TAG, "Process name indicates manager mode - Manager Mode");
+                    return LSPatchMode.LSPATCH_MANAGER;
+                }
+            }
+        } catch (Exception e) {
+            Log.d(TAG, "Process name check error: " + e.getMessage());
         }
         
         // Default to embedded mode if LSPatch is detected but mode is unclear
+        // This is the most common scenario
+        Log.d(TAG, "Mode unclear, defaulting to Embedded Mode");
         return LSPatchMode.LSPATCH_EMBEDDED;
     }
     
@@ -435,11 +517,73 @@ public class LSPatchCompat {
         return false;
     }
     
+    /**
+     * Get current process name
+     */
+    private static String getCurrentProcessName() {
+        try {
+            // Method 1: Use ActivityManager
+            Context context = getCurrentContext();
+            if (context != null) {
+                android.app.ActivityManager am = (android.app.ActivityManager) context.getSystemService(Context.ACTIVITY_SERVICE);
+                if (am != null) {
+                    List<android.app.ActivityManager.RunningAppProcessInfo> processInfos = am.getRunningAppProcesses();
+                    int pid = android.os.Process.myPid();
+                    for (android.app.ActivityManager.RunningAppProcessInfo info : processInfos) {
+                        if (info.pid == pid) {
+                            return info.processName;
+                        }
+                    }
+                }
+            }
+            
+            // Method 2: Read from /proc/self/cmdline
+            java.io.BufferedReader reader = new java.io.BufferedReader(new java.io.FileReader("/proc/self/cmdline"));
+            String processName = reader.readLine().trim();
+            reader.close();
+            return processName;
+            
+        } catch (Exception e) {
+            Log.d(TAG, "Error getting process name: " + e.getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * Get current application context
+     */
+    private static Context getCurrentContext() {
+        try {
+            // Method 1: ActivityThread.currentApplication()
+            Class<?> activityThreadClass = Class.forName("android.app.ActivityThread");
+            Method currentActivityThreadMethod = activityThreadClass.getMethod("currentActivityThread");
+            Object activityThread = currentActivityThreadMethod.invoke(null);
+            Method getApplicationMethod = activityThreadClass.getMethod("getApplication");
+            return (Context) getApplicationMethod.invoke(activityThread);
+        } catch (Exception e) {
+            try {
+                // Method 2: AppGlobals.getInitialApplication()
+                Class<?> appGlobalsClass = Class.forName("android.app.AppGlobals");
+                Method getInitialApplicationMethod = appGlobalsClass.getMethod("getInitialApplication");
+                return (Context) getInitialApplicationMethod.invoke(null);
+            } catch (Exception e2) {
+                Log.d(TAG, "Error getting current context: " + e2.getMessage());
+                return null;
+            }
+        }
+    }
+
+    /**
+     * Check if a class is available in the current classloader
+     */
     private static boolean isClassAvailable(String className) {
         try {
             Class.forName(className);
             return true;
         } catch (ClassNotFoundException e) {
+            return false;
+        } catch (Exception e) {
+            Log.d(TAG, "Error checking class availability: " + e.getMessage());
             return false;
         }
     }
@@ -491,25 +635,5 @@ public class LSPatchCompat {
         Log.i(TAG, "Signature Bypass: " + isFeatureAvailable("SIGNATURE_BYPASS"));
         Log.i(TAG, "Bridge Service: " + isFeatureAvailable("BRIDGE_SERVICE"));
         Log.i(TAG, "=======================================");
-    }
-    
-    /**
-     * Get current context (helper method for detection)
-     */
-    private static Context getCurrentContext() {
-        try {
-            // Try to get context from ActivityThread
-            Class<?> activityThreadClass = Class.forName("android.app.ActivityThread");
-            Object activityThread = activityThreadClass.getMethod("currentActivityThread").invoke(null);
-            return (Context) activityThreadClass.getMethod("getApplication").invoke(activityThread);
-        } catch (Exception e) {
-            try {
-                // Fallback: try to get from AndroidAppHelper if available
-                Class<?> appHelperClass = Class.forName("android.app.AndroidAppHelper");
-                return (Context) appHelperClass.getMethod("currentApplication").invoke(null);
-            } catch (Exception e2) {
-                return null;
-            }
-        }
     }
 }

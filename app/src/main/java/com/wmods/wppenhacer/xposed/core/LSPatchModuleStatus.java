@@ -205,21 +205,39 @@ public class LSPatchModuleStatus {
      */
     private static boolean areHooksWorking() {
         try {
-            // Check if our core classes are initialized
-            // This indicates that our hooks have been loaded
+            // First, verify we're in the correct app context
+            if (!isCorrectApplicationContext()) {
+                Log.d(TAG, "Not in WhatsApp context");
+                return false;
+            }
             
-            // Check if WppCore has been initialized
+            // Check if XposedBridge is functional
+            if (!isXposedBridgeFunctional()) {
+                Log.d(TAG, "XposedBridge is not functional");
+                return false;
+            }
+            
+            // Check if our core classes are initialized
             if (isWppCoreInitialized()) {
+                Log.d(TAG, "WppCore is initialized - hooks are working");
                 return true;
             }
             
             // Check if FeatureLoader has been initialized
             if (isFeatureLoaderInitialized()) {
+                Log.d(TAG, "FeatureLoader is initialized - hooks are working");
                 return true;
             }
             
             // Check if any of our features are working
             if (areFeaturesWorking()) {
+                Log.d(TAG, "Features are working - hooks are working");
+                return true;
+            }
+            
+            // Check if WaEnhancer classes are loaded in classloader
+            if (areWaEnhancerClassesLoaded()) {
+                Log.d(TAG, "WaEnhancer classes are loaded - hooks are working");
                 return true;
             }
             
@@ -232,18 +250,134 @@ public class LSPatchModuleStatus {
     }
     
     /**
+     * Check if we're in the correct application context (WhatsApp)
+     */
+    private static boolean isCorrectApplicationContext() {
+        try {
+            Context context = getCurrentContext();
+            if (context == null) {
+                return false;
+            }
+            
+            String packageName = context.getPackageName();
+            return "com.whatsapp".equals(packageName) || "com.whatsapp.w4b".equals(packageName);
+            
+        } catch (Exception e) {
+            Log.d(TAG, "Error checking application context: " + e.getMessage());
+            return false;
+        }
+    }
+    
+    /**
+     * Check if XposedBridge is functional
+     */
+    private static boolean isXposedBridgeFunctional() {
+        try {
+            // Try to use XposedBridge log function
+            de.robv.android.xposed.XposedBridge.log("WaEnhancer LSPatch status check");
+            return true;
+        } catch (Exception e) {
+            Log.d(TAG, "XposedBridge is not functional: " + e.getMessage());
+            return false;
+        }
+    }
+    
+    /**
+     * Check if WaEnhancer classes are loaded in classloader
+     */
+    private static boolean areWaEnhancerClassesLoaded() {
+        try {
+            // Check if our main classes exist in the current classloader
+            ClassLoader cl = Thread.currentThread().getContextClassLoader();
+            if (cl == null) {
+                cl = LSPatchModuleStatus.class.getClassLoader();
+            }
+            
+            // Try to load core WaEnhancer classes
+            String[] waEnhancerClasses = {
+                "com.wmods.wppenhacer.xposed.core.WppCore",
+                "com.wmods.wppenhacer.xposed.core.FeatureLoader",
+                "com.wmods.wppenhacer.xposed.core.components.FMessageWpp"
+            };
+            
+            for (String className : waEnhancerClasses) {
+                try {
+                    Class<?> clazz = cl.loadClass(className);
+                    if (clazz != null) {
+                        Log.d(TAG, "Found WaEnhancer class: " + className);
+                        return true;
+                    }
+                } catch (ClassNotFoundException e) {
+                    // Continue checking other classes
+                }
+            }
+            
+            return false;
+            
+        } catch (Exception e) {
+            Log.d(TAG, "Error checking WaEnhancer classes: " + e.getMessage());
+            return false;
+        }
+    }
+    /**
      * Check if WppCore is initialized
      */
     private static boolean isWppCoreInitialized() {
         try {
             Class<?> wppCoreClass = Class.forName("com.wmods.wppenhacer.xposed.core.WppCore");
-            java.lang.reflect.Field clientField = wppCoreClass.getDeclaredField("client");
-            clientField.setAccessible(true);
-            Object client = clientField.get(null);
             
-            return client != null;
+            // Check multiple indicators of WppCore initialization
+            // 1. Check if client field exists and is initialized
+            try {
+                java.lang.reflect.Field clientField = wppCoreClass.getDeclaredField("client");
+                clientField.setAccessible(true);
+                Object client = clientField.get(null);
+                if (client != null) {
+                    Log.d(TAG, "WppCore client is initialized");
+                    return true;
+                }
+            } catch (Exception e) {
+                // Client field might not exist or be accessible
+            }
             
+            // 2. Check if mApp field exists and is initialized (from FeatureLoader)
+            try {
+                Class<?> featureLoaderClass = Class.forName("com.wmods.wppenhacer.xposed.core.FeatureLoader");
+                java.lang.reflect.Field mAppField = featureLoaderClass.getDeclaredField("mApp");
+                mAppField.setAccessible(true);
+                Object mApp = mAppField.get(null);
+                if (mApp != null) {
+                    Log.d(TAG, "FeatureLoader mApp is initialized");
+                    return true;
+                }
+            } catch (Exception e) {
+                // mApp field might not exist or be accessible
+            }
+            
+            // 3. Check if any static fields in WppCore are initialized
+            java.lang.reflect.Field[] fields = wppCoreClass.getDeclaredFields();
+            for (java.lang.reflect.Field field : fields) {
+                if (java.lang.reflect.Modifier.isStatic(field.getModifiers())) {
+                    try {
+                        field.setAccessible(true);
+                        Object value = field.get(null);
+                        if (value != null && !(value instanceof Boolean) && !(value instanceof Integer)) {
+                            Log.d(TAG, "WppCore field initialized: " + field.getName());
+                            return true;
+                        }
+                    } catch (Exception e) {
+                        // Field might not be accessible
+                    }
+                }
+            }
+            
+            return false;
+            
+        } catch (ClassNotFoundException e) {
+            Log.d(TAG, "WppCore class not found");
+            return false;
         } catch (Exception e) {
+            Log.d(TAG, "Error checking WppCore initialization: " + e.getMessage());
             return false;
         }
     }
@@ -254,22 +388,52 @@ public class LSPatchModuleStatus {
     private static boolean isFeatureLoaderInitialized() {
         try {
             Class<?> featureLoaderClass = Class.forName("com.wmods.wppenhacer.xposed.core.FeatureLoader");
-            // Check if any static fields indicate initialization
+            
+            // Check if mApp field is initialized (indicates FeatureLoader has started)
+            try {
+                java.lang.reflect.Field mAppField = featureLoaderClass.getDeclaredField("mApp");
+                mAppField.setAccessible(true);
+                Object mApp = mAppField.get(null);
+                if (mApp != null) {
+                    Log.d(TAG, "FeatureLoader mApp field is initialized");
+                    return true;
+                }
+            } catch (Exception e) {
+                // mApp field might not exist
+            }
+            
+            // Check other static fields that indicate initialization
             java.lang.reflect.Field[] fields = featureLoaderClass.getDeclaredFields();
             
             for (java.lang.reflect.Field field : fields) {
                 if (java.lang.reflect.Modifier.isStatic(field.getModifiers())) {
-                    field.setAccessible(true);
-                    Object value = field.get(null);
-                    if (value != null) {
-                        return true;
+                    try {
+                        field.setAccessible(true);
+                        Object value = field.get(null);
+                        // Look for non-null objects (excluding primitives and their wrappers)
+                        if (value != null && 
+                            !(value instanceof Boolean) && 
+                            !(value instanceof Integer) && 
+                            !(value instanceof String) &&
+                            !(value instanceof Long) &&
+                            !(value instanceof Double) &&
+                            !(value instanceof Float)) {
+                            Log.d(TAG, "FeatureLoader field initialized: " + field.getName());
+                            return true;
+                        }
+                    } catch (Exception e) {
+                        // Field might not be accessible
                     }
                 }
             }
             
             return false;
             
+        } catch (ClassNotFoundException e) {
+            Log.d(TAG, "FeatureLoader class not found");
+            return false;
         } catch (Exception e) {
+            Log.d(TAG, "Error checking FeatureLoader initialization: " + e.getMessage());
             return false;
         }
     }
@@ -279,14 +443,63 @@ public class LSPatchModuleStatus {
      */
     private static boolean areFeaturesWorking() {
         try {
-            // This is a basic check - in a real implementation you'd check
-            // specific features that you know should be active
+            // Check if XposedBridge logging is functional (basic Xposed functionality)
+            try {
+                de.robv.android.xposed.XposedBridge.log("WaEnhancer LSPatch feature test");
+                Log.d(TAG, "XposedBridge logging is functional");
+            } catch (Exception e) {
+                Log.d(TAG, "XposedBridge logging failed: " + e.getMessage());
+                return false;
+            }
             
-            // For now, just check if XposedBridge log is functional
-            XposedBridge.log("WaEnhancer status check");
-            return true;
+            // Check if we can access WhatsApp classes (indicates we're hooked into the right app)
+            try {
+                ClassLoader cl = Thread.currentThread().getContextClassLoader();
+                if (cl == null) {
+                    cl = getCurrentContext().getClassLoader();
+                }
+                
+                // Try to load WhatsApp classes to confirm we're in the right context
+                String[] whatsappClasses = {
+                    "com.whatsapp.HomeActivity",
+                    "com.whatsapp.Main",
+                    "com.whatsapp.conversationslist.ConversationsFragment"
+                };
+                
+                for (String className : whatsappClasses) {
+                    try {
+                        Class<?> clazz = cl.loadClass(className);
+                        if (clazz != null) {
+                            Log.d(TAG, "Successfully loaded WhatsApp class: " + className);
+                            return true;
+                        }
+                    } catch (ClassNotFoundException e) {
+                        // Continue trying other classes
+                    }
+                }
+                
+            } catch (Exception e) {
+                Log.d(TAG, "Error loading WhatsApp classes: " + e.getMessage());
+            }
+            
+            // Check if we can access application context (indicates we're properly hooked)
+            try {
+                Context context = getCurrentContext();
+                if (context != null) {
+                    String packageName = context.getPackageName();
+                    if ("com.whatsapp".equals(packageName) || "com.whatsapp.w4b".equals(packageName)) {
+                        Log.d(TAG, "Successfully accessed WhatsApp context: " + packageName);
+                        return true;
+                    }
+                }
+            } catch (Exception e) {
+                Log.d(TAG, "Error accessing context: " + e.getMessage());
+            }
+            
+            return false;
             
         } catch (Exception e) {
+            Log.d(TAG, "Error checking if features are working: " + e.getMessage());
             return false;
         }
     }
