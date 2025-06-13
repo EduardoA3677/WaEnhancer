@@ -8,6 +8,7 @@ import de.robv.android.xposed.XposedBridge;
 import java.io.File;
 import java.lang.reflect.Method;
 import java.util.List;
+import java.util.Set;
 
 /**
  * LSPatch Compatibility Layer for WaEnhancer
@@ -329,6 +330,11 @@ public class LSPatchCompat {
             return true;
         }
         
+        // Enhanced detection: Check for LSPatch dex injection markers
+        if (isLSPatchDexInjectionPresent()) {
+            return true;
+        }
+        
         // Quaternary detection: Check for LSPatch specific system properties
         try {
             String lspatchMarker = System.getProperty("lspatch.enabled");
@@ -436,7 +442,22 @@ public class LSPatchCompat {
         
         Log.d(TAG, "Starting enhanced LSPatch mode detection");
         
-        // Method 1: Check system properties first (most reliable)
+        // Method 0: Check for dex injection first (most definitive for embedded/local mode)
+        if (isLSPatchDexInjectionPresent()) {
+            Log.d(TAG, "LSPatch dex injection detected - likely embedded/local mode");
+            
+            // Double-check with context to confirm
+            Context context = getCurrentContext();
+            if (context != null) {
+                String packageName = context.getPackageName();
+                if ("com.whatsapp".equals(packageName) || "com.whatsapp.w4b".equals(packageName)) {
+                    Log.d(TAG, "Dex injection in WhatsApp context confirmed - Embedded Mode");
+                    return LSPatchMode.LSPATCH_EMBEDDED;
+                }
+            }
+        }
+        
+        // Method 1: Check system properties (most reliable)
         try {
             String lspatchMode = System.getProperty("lspatch.mode");
             if ("embedded".equals(lspatchMode) || "local".equals(lspatchMode)) {
@@ -815,5 +836,95 @@ public class LSPatchCompat {
         Log.i(TAG, "Signature Bypass: " + isFeatureAvailable("SIGNATURE_BYPASS"));
         Log.i(TAG, "Bridge Service: " + isFeatureAvailable("BRIDGE_SERVICE"));
         Log.i(TAG, "=======================================");
+    }
+    
+    /**
+     * Check for LSPatch dex injection markers
+     * This detects when LSPatch has injected dex files into the application
+     */
+    private static boolean isLSPatchDexInjectionPresent() {
+        try {
+            // Check for LSPatch-specific system properties that indicate dex injection
+            String[] dexProperties = {
+                "lspatch.dex.injected",
+                "lspatch.loader.injected", 
+                "lspatch.hook.enabled",
+                "lspatch.module.loaded"
+            };
+            
+            for (String prop : dexProperties) {
+                if ("true".equals(System.getProperty(prop))) {
+                    Log.d(TAG, "LSPatch dex injection detected via property: " + prop);
+                    return true;
+                }
+            }
+            
+            // Check for LSPatch-specific thread names
+            Set<Thread> allThreads = Thread.getAllStackTraces().keySet();
+            for (Thread thread : allThreads) {
+                String threadName = thread.getName();
+                if (threadName != null && (threadName.contains("LSPatch") || 
+                    threadName.contains("lspatch") || threadName.contains("LSP"))) {
+                    Log.d(TAG, "LSPatch thread detected: " + threadName);
+                    return true;
+                }
+            }
+            
+            // Check for LSPatch-specific classloader patterns
+            ClassLoader cl = Thread.currentThread().getContextClassLoader();
+            if (cl != null) {
+                String clString = cl.toString();
+                if (clString.contains("LSPatch") || clString.contains("lspatch") || 
+                    clString.contains("LSP_") || clString.contains("org.lsposed")) {
+                    Log.d(TAG, "LSPatch classloader detected: " + clString);
+                    return true;
+                }
+            }
+            
+            // Check for WaEnhancer being loaded in a different context (indicates LSPatch)
+            try {
+                String packageName = getCurrentPackageName();
+                if ("com.whatsapp".equals(packageName) || "com.whatsapp.w4b".equals(packageName)) {
+                    // We're in WhatsApp but WaEnhancer classes are available - this indicates LSPatch
+                    try {
+                        Class.forName("com.wmods.wppenhacer.xposed.core.FeatureLoader");
+                        Log.d(TAG, "WaEnhancer classes detected in WhatsApp context - LSPatch confirmed");
+                        return true;
+                    } catch (ClassNotFoundException e) {
+                        // WaEnhancer not loaded, probably not LSPatch
+                    }
+                }
+            } catch (Exception e) {
+                // Context access failed
+            }
+            
+        } catch (Exception e) {
+            Log.d(TAG, "Error checking LSPatch dex injection: " + e.getMessage());
+        }
+        
+        return false;
+    }
+    
+    /**
+     * Get current package name
+     */
+    private static String getCurrentPackageName() {
+        try {
+            Class<?> activityThreadClass = Class.forName("android.app.ActivityThread");
+            Object activityThread = activityThreadClass.getMethod("currentActivityThread").invoke(null);
+            Object app = activityThreadClass.getMethod("getApplication").invoke(activityThread);
+            if (app != null) {
+                return (String) app.getClass().getMethod("getPackageName").invoke(app);
+            }
+        } catch (Exception e) {
+            // Fallback methods
+            try {
+                // Try getting from system properties
+                return System.getProperty("java.class.path");
+            } catch (Exception e2) {
+                // Ignore
+            }
+        }
+        return null;
     }
 }
