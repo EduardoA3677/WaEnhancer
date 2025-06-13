@@ -9,3 +9,23 @@
 .cxx
 local.properties
 key.jks
+
+# Gradle
+.gradle/
+**/build/
+
+# VS Code
+.vscode/
+
+# Dev Container
+.devcontainer/
+
+# Gradle
+.gradle/
+**/build/
+
+# VS Code
+.vscode/
+
+# Dev Container
+.devcontainer/
