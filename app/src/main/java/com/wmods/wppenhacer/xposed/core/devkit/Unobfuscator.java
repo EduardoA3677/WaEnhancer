@@ -65,7 +65,9 @@ public class Unobfuscator {
     public static final HashMap<String, Class<?>> cacheClasses = new HashMap<>();
 
     static {
-        System.loadLibrary("dexkit");
+        // Ya no cargamos la librería nativa de DexKit, usando implementación stub
+        // System.loadLibrary("dexkit");
+        Log.i(TAG, "Inicializando Unobfuscator con implementación stub de DexKit");
     }
 
     public static boolean initWithPath(String path) {

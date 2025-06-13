@@ -200,24 +200,24 @@ public class FeatureLoader {
     }
 
     /**
-     * Initialize DexKit with LSPatch support
+     * Initialize compatibility layer with LSPatch support
      */
     private static boolean initDexKitWithLSPatchSupport(String sourceDir) {
         if (LSPatchCompat.isLSPatchEnvironment()) {
-            XposedBridge.log("Initializing DexKit with LSPatch compatibility");
+            XposedBridge.log("Initializing with LSPatch compatibility");
             
-            // Use LSPatch-compatible DexKit initialization
+            // Use LSPatch-compatible initialization
             try {
-                io.luckypray.dexkit.DexKitBridge bridge = LSPatchDexKitCompat.initDexKit(sourceDir);
-                if (bridge != null) {
-                    // Initialize standard Unobfuscator with the LSPatch-compatible bridge
+                boolean success = LSPatchDexKitCompat.initDexKit(sourceDir);
+                if (success) {
+                    // Initialize standard Unobfuscator
                     return Unobfuscator.initWithPath(sourceDir);
                 } else {
-                    XposedBridge.log("LSPatch DexKit initialization failed, trying standard initialization");
+                    XposedBridge.log("LSPatch initialization failed, trying standard initialization");
                     return Unobfuscator.initWithPath(sourceDir);
                 }
             } catch (Exception e) {
-                XposedBridge.log("LSPatch DexKit initialization error: " + e.getMessage());
+                XposedBridge.log("LSPatch initialization error: " + e.getMessage());
                 // Fallback to standard initialization
                 return Unobfuscator.initWithPath(sourceDir);
             }

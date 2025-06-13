@@ -218,124 +218,18 @@ public class LSPatchCompat {
     }
     
     private static boolean detectLSPatchEnvironment() {
-        // Check for LSPatch loader classes
-        if (isClassAvailable(LSPATCH_LOADER_CLASS) ||
-            isClassAvailable(LSPATCH_METALOADER_CLASS) ||
-            isClassAvailable(LSPATCH_SERVICE_CLASS) ||
-            isClassAvailable(LSPATCH_BRIDGE_CLASS) ||
-            isClassAvailable(LSPATCH_XPOSED_INIT) ||
-            isClassAvailable(LSPATCH_MODULE_SERVICE) ||
-            isClassAvailable(LSPATCH_REMOTE_SERVICE)) {
-            return true;
-        }
-        
-        // Check for LSPatch specific system properties
-        try {
-            String lspatchMarker = System.getProperty("lspatch.enabled");
-            if ("true".equals(lspatchMarker)) {
-                return true;
-            }
-            
-            // Check for LSPatch version property
-            String lspatchVersion = System.getProperty("lspatch.version");
-            if (lspatchVersion != null && !lspatchVersion.isEmpty()) {
-                return true;
-            }
-        } catch (Exception e) {
-            // System property access might be restricted
-        }
-        
-        // Check for LSPatch specific environment variables
-        try {
-            String lspatchEnv = System.getenv("LSPATCH_ACTIVE");
-            if ("1".equals(lspatchEnv)) {
-                return true;
-            }
-            
-            String lspatchMode = System.getenv("LSPATCH_MODE");
-            if (lspatchMode != null && !lspatchMode.isEmpty()) {
-                return true;
-            }
-        } catch (Exception e) {
-            // Environment access might be restricted
-        }
-        
-        // Check for LSPatch config file in assets
-        try {
-            ClassLoader cl = Thread.currentThread().getContextClassLoader();
-            if (cl != null && cl.getResource(LSPATCH_CONFIG_PATH) != null) {
-                return true;
-            }
-        } catch (Exception e) {
-            // Resource access might fail
-        }
-        
-        return false;
+        // Usar la nueva clase LSDetector para detectar LSPatch
+        return LSDetector.isLSPatchEnvironment();
     }
     
     private static LSPatchMode detectLSPatchMode() {
-        // Check if manager mode is active
-        if (isClassAvailable("org.lsposed.lspatch.service.RemoteApplicationService")) {
-            return LSPatchMode.LSPATCH_MANAGER;
-        }
-        
-        // Check if embedded mode is active
-        if (isClassAvailable("org.lsposed.lspatch.service.LocalApplicationService")) {
-            return LSPatchMode.LSPATCH_EMBEDDED;
-        }
-        
-        // Check for LSPatch meta loader (indicates patched APK)
-        if (isClassAvailable(LSPATCH_METALOADER_CLASS)) {
-            return LSPatchMode.LSPATCH_EMBEDDED;
-        }
-        
-        // Check for manager package name in system
-        try {
-            String managerPackage = System.getProperty("lspatch.manager.package");
-            if ("org.lsposed.lspatch".equals(managerPackage)) {
-                return LSPatchMode.LSPATCH_MANAGER;
-            }
-        } catch (Exception e) {
-            // Property access might be restricted
-        }
-        
-        // Default to embedded mode if LSPatch is detected
-        return LSPatchMode.LSPATCH_EMBEDDED;
+        // Usar la nueva clase LSDetector para detectar el modo de operación
+        return LSDetector.detectOperationMode();
     }
     
     private static boolean checkApplicationPatched(Context context) {
-        if (context == null) {
-            return false;
-        }
-        
-        try {
-            ApplicationInfo appInfo = context.getApplicationInfo();
-            
-            // Check for LSPatch metadata
-            if (appInfo.metaData != null && appInfo.metaData.containsKey("lspatch")) {
-                return true;
-            }
-            
-            // Check for LSPatch specific app component factory
-            if ("org.lsposed.lspatch.metaloader.LSPAppComponentFactoryStub".equals(appInfo.appComponentFactory)) {
-                return true;
-            }
-            
-            // Check for LSPatch assets
-            try {
-                String[] assets = context.getAssets().list("lspatch");
-                if (assets != null && assets.length > 0) {
-                    return true;
-                }
-            } catch (Exception e) {
-                // Assets access might fail
-            }
-            
-        } catch (Exception e) {
-            Log.d(TAG, "Error checking application patch status: " + e.getMessage());
-        }
-        
-        return false;
+        // Usar la nueva clase LSDetector para verificar si la aplicación está parcheada
+        return LSDetector.isAppPatched(context);
     }
     
     private static boolean isClassAvailable(String className) {

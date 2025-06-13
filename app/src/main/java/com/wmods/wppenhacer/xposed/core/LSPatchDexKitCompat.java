@@ -3,278 +3,192 @@ package com.wmods.wppenhacer.xposed.core;
 import android.util.Log;
 
 import de.robv.android.xposed.XposedBridge;
-import io.luckypray.dexkit.DexKitBridge;
 
 /**
- * LSPatch Compatibility Layer for DexKit
+ * LSPatch Compatibility Layer for Module Loading
  * 
- * This class provides LSPatch-compatible DexKit initialization and operations.
- * LSPatch environments may have different classloader and dex file access patterns
- * compared to traditional Xposed, requiring specialized handling.
+ * Esta clase proporciona una capa de compatibilidad para cargar y gestionar módulos
+ * tanto en entornos LSPosed (con root) como LSPatch (sin root).
  */
 public class LSPatchDexKitCompat {
-    private static final String TAG = "WaEnhancer-DexKit-LSPatch";
+    private static final String TAG = "WaEnhancer-LSPatch";
     
-    private static DexKitBridge lspatchBridge = null;
     private static boolean initialized = false;
     
     /**
-     * Initializes DexKit with LSPatch compatibility
-     * @param sourceDir Path to the source directory
-     * @return DexKitBridge instance or null if initialization failed
+     * Inicializa el entorno de compatibilidad con LSPatch
+     * @param sourceDir Ruta al directorio fuente
+     * @return true si la inicialización fue exitosa
      */
-    public static DexKitBridge initDexKit(String sourceDir) {
-        if (initialized && lspatchBridge != null) {
-            return lspatchBridge;
+    public static boolean initDexKit(String sourceDir) {
+        if (initialized) {
+            return true;
         }
         
         try {
-            Log.i(TAG, "Initializing DexKit for LSPatch environment");
+            Log.i(TAG, "Inicializando compatibilidad para LSPatch");
             
-            // Use LSPatch-compatible DexKit initialization
-            lspatchBridge = initLSPatchDexKit(sourceDir);
+            // Verificar el entorno LSPatch
+            boolean isLSPatchEnv = LSPatchCompat.isLSPatchEnvironment();
             
-            if (lspatchBridge != null) {
-                initialized = true;
-                Log.i(TAG, "DexKit initialized successfully for LSPatch");
-                return lspatchBridge;
+            if (isLSPatchEnv) {
+                Log.i(TAG, "Entorno LSPatch detectado, aplicando configuración específica");
+                // Configurar para LSPatch
+                initialized = configureForLSPatch(sourceDir);
             } else {
-                Log.w(TAG, "LSPatch DexKit initialization failed, attempting fallback");
-                return initFallbackDexKit(sourceDir);
+                Log.i(TAG, "Entorno LSPosed estándar detectado");
+                // Configurar para Xposed clásico
+                initialized = configureForXposed(sourceDir);
+            }
+            
+            if (initialized) {
+                Log.i(TAG, "Inicialización completada con éxito");
+                return true;
+            } else {
+                Log.w(TAG, "La inicialización falló, utilizando modo de compatibilidad básico");
+                return false;
             }
             
         } catch (Exception e) {
-            Log.e(TAG, "Error initializing DexKit for LSPatch: " + e.getMessage());
-            XposedBridge.log("LSPatch DexKit error: " + e.getMessage());
-            
-            // Try fallback initialization
-            return initFallbackDexKit(sourceDir);
+            Log.e(TAG, "Error al inicializar la compatibilidad: " + e.getMessage());
+            XposedBridge.log("Error de inicialización: " + e.getMessage());
+            return false;
         }
     }
     
     /**
-     * Gets the current DexKit bridge instance
-     * @return DexKitBridge instance or null if not initialized
-     */
-    public static DexKitBridge getBridge() {
-        return lspatchBridge;
-    }
-    
-    /**
-     * Checks if DexKit is properly initialized for LSPatch
-     * @return true if initialized
+     * Verifica si el módulo está inicializado
+     * @return true si está inicializado
      */
     public static boolean isInitialized() {
-        return initialized && lspatchBridge != null;
+        return initialized;
     }
     
     /**
-     * Closes the DexKit bridge and cleans up resources
+     * Cierra los recursos y limpia el entorno
      */
     public static void close() {
-        if (lspatchBridge != null) {
+        if (initialized) {
             try {
-                lspatchBridge.close();
-                Log.i(TAG, "DexKit bridge closed successfully");
-            } catch (Exception e) {
-                Log.e(TAG, "Error closing DexKit bridge: " + e.getMessage());
-            } finally {
-                lspatchBridge = null;
+                Log.i(TAG, "Limpiando recursos");
+                // Cualquier limpieza necesaria
                 initialized = false;
+            } catch (Exception e) {
+                Log.e(TAG, "Error al cerrar recursos: " + e.getMessage());
             }
         }
     }
     
     /**
-     * LSPatch-specific DexKit initialization
-     * This method handles the unique requirements of LSPatch environments
+     * Configura el entorno para LSPatch
      */
-    private static DexKitBridge initLSPatchDexKit(String sourceDir) {
+    private static boolean configureForLSPatch(String sourceDir) {
         try {
-            Log.d(TAG, "Attempting LSPatch-specific DexKit initialization with source: " + sourceDir);
+            Log.d(TAG, "Configurando para LSPatch con origen: " + sourceDir);
             
-            // LSPatch may use different classloader patterns
-            // We need to account for patched DEX files and modified class loading
+            // Aplicar configuraciones específicas para LSPatch
             
-            DexKitBridge bridge = null;
-            
-            // Try LSPatch-aware initialization
-            if (LSPatchCompat.getCurrentMode() == LSPatchCompat.LSPatchMode.LSPATCH_EMBEDDED) {
-                // Embedded mode: modules are integrated into the app DEX
-                bridge = initEmbeddedModeDexKit(sourceDir);
-            } else if (LSPatchCompat.getCurrentMode() == LSPatchCompat.LSPatchMode.LSPATCH_MANAGER) {
-                // Manager mode: modules are loaded through LSPatch manager
-                bridge = initManagerModeDexKit(sourceDir);
+            // Configurar según modo LSPatch
+            LSPatchCompat.LSPatchMode mode = LSPatchCompat.getCurrentMode();
+            switch (mode) {
+                case LSPATCH_EMBEDDED:
+                    // Modo incrustado: módulos integrados en el APK
+                    configureEmbeddedMode(sourceDir);
+                    break;
+                case LSPATCH_MANAGER:
+                    // Modo gestor: módulos cargados a través del gestor LSPatch
+                    configureManagerMode(sourceDir);
+                    break;
+                default:
+                    Log.w(TAG, "Modo LSPatch desconocido, usando configuración genérica");
             }
             
-            if (bridge == null) {
-                // Fallback to standard initialization with LSPatch adaptations
-                bridge = DexKitBridge.create(sourceDir);
-                if (bridge != null) {
-                    Log.d(TAG, "Standard DexKit initialization successful in LSPatch environment");
-                }
+            // Establecer propiedades del sistema para LSPatch
+            try {
+                System.setProperty("waenhancer.lspatch.compatibility", "true");
+            } catch (Exception e) {
+                Log.d(TAG, "No se pudieron establecer propiedades: " + e.getMessage());
             }
             
-            return bridge;
+            return true;
             
         } catch (Exception e) {
-            Log.e(TAG, "LSPatch-specific DexKit initialization failed: " + e.getMessage());
-            return null;
+            Log.e(TAG, "Error al configurar LSPatch: " + e.getMessage());
+            return false;
         }
     }
     
     /**
-     * Initialize DexKit for LSPatch embedded mode
+     * Configura el entorno para LSPosed clásico
      */
-    private static DexKitBridge initEmbeddedModeDexKit(String sourceDir) {
+    private static boolean configureForXposed(String sourceDir) {
         try {
-            Log.d(TAG, "Initializing DexKit for LSPatch embedded mode");
+            Log.d(TAG, "Configurando para Xposed clásico");
             
-            // In embedded mode, the module classes are integrated into the target app's DEX files
-            // We may need to handle multiple DEX files or modified DEX structures
+            // Configuraciones específicas para Xposed con root
             
-            DexKitBridge bridge = DexKitBridge.create(sourceDir);
-            
-            if (bridge != null) {
-                // Apply embedded mode specific configurations
-                Log.d(TAG, "DexKit embedded mode initialization successful");
-                
-                // Set LSPatch-specific options if available
-                try {
-                    // Configure for embedded module environment
-                    System.setProperty("dexkit.lspatch.embedded", "true");
-                } catch (Exception e) {
-                    Log.d(TAG, "Could not set embedded mode properties: " + e.getMessage());
-                }
-            }
-            
-            return bridge;
-            
+            return true;
         } catch (Exception e) {
-            Log.e(TAG, "Embedded mode DexKit initialization failed: " + e.getMessage());
-            return null;
+            Log.e(TAG, "Error al configurar Xposed: " + e.getMessage());
+            return false;
         }
     }
     
     /**
-     * Initialize DexKit for LSPatch manager mode
+     * Configura el entorno para modo incrustado de LSPatch
      */
-    private static DexKitBridge initManagerModeDexKit(String sourceDir) {
+    private static void configureEmbeddedMode(String sourceDir) {
+        Log.d(TAG, "Configurando para modo incrustado de LSPatch");
+        
+        // Establecer propiedades específicas para modo incrustado
         try {
-            Log.d(TAG, "Initializing DexKit for LSPatch manager mode");
-            
-            // In manager mode, modules are loaded through the LSPatch manager
-            // This may involve different classloader patterns and security contexts
-            
-            DexKitBridge bridge = DexKitBridge.create(sourceDir);
-            
-            if (bridge != null) {
-                // Apply manager mode specific configurations
-                Log.d(TAG, "DexKit manager mode initialization successful");
-                
-                // Set LSPatch-specific options if available
-                try {
-                    // Configure for manager mode environment
-                    System.setProperty("dexkit.lspatch.manager", "true");
-                } catch (Exception e) {
-                    Log.d(TAG, "Could not set manager mode properties: " + e.getMessage());
-                }
-            }
-            
-            return bridge;
-            
+            System.setProperty("waenhancer.lspatch.mode", "embedded");
         } catch (Exception e) {
-            Log.e(TAG, "Manager mode DexKit initialization failed: " + e.getMessage());
-            return null;
+            Log.d(TAG, "No se pudieron establecer propiedades de modo incrustado: " + e.getMessage());
         }
     }
     
     /**
-     * Fallback DexKit initialization for when LSPatch-specific init fails
+     * Configura el entorno para modo gestor de LSPatch
      */
-    private static DexKitBridge initFallbackDexKit(String sourceDir) {
+    private static void configureManagerMode(String sourceDir) {
+        Log.d(TAG, "Configurando para modo gestor de LSPatch");
+        
+        // Establecer propiedades específicas para modo gestor
         try {
-            Log.d(TAG, "Attempting fallback DexKit initialization");
-            
-            // Standard DexKit initialization as fallback
-            DexKitBridge bridge = DexKitBridge.create(sourceDir);
-            
-            if (bridge != null) {
-                Log.i(TAG, "Fallback DexKit initialization successful");
-                lspatchBridge = bridge;
-                initialized = true;
-                return bridge;
-            } else {
-                Log.e(TAG, "Fallback DexKit initialization also failed");
-                return null;
-            }
-            
+            System.setProperty("waenhancer.lspatch.mode", "manager");
         } catch (Exception e) {
-            Log.e(TAG, "Fallback DexKit initialization error: " + e.getMessage());
-            XposedBridge.log("DexKit fallback initialization failed: " + e.getMessage());
-            return null;
+            Log.d(TAG, "No se pudieron establecer propiedades de modo gestor: " + e.getMessage());
         }
     }
     
     /**
-     * Checks if DexKit operations are supported in current LSPatch environment
-     * @param operation The operation to check
-     * @return true if operation is supported
+     * Comprueba si una operación específica es compatible con el entorno LSPatch actual
+     * @param operation La operación a verificar
+     * @return true si la operación es compatible
      */
     public static boolean isOperationSupported(String operation) {
         if (!LSPatchCompat.isLSPatchEnvironment()) {
-            return true; // All operations supported in classic Xposed
+            return true; // Todas las operaciones son compatibles en Xposed clásico
         }
         
         switch (operation) {
             case "FIND_CLASS":
             case "FIND_METHOD":
             case "FIND_FIELD":
-                return true; // Basic operations are supported
+                return true; // Operaciones básicas soportadas
                 
             case "FIND_CALLER":
             case "FIND_INVOCATION":
-                // These may have limitations in some LSPatch modes
+                // Estas pueden tener limitaciones en algunos modos LSPatch
                 return LSPatchCompat.getCurrentMode() == LSPatchCompat.LSPatchMode.LSPATCH_EMBEDDED;
                 
             case "MODIFY_DEX":
             case "WRITE_DEX":
-                return false; // DEX modification not supported in LSPatch
+                return false; // Modificación DEX no soportada en LSPatch
                 
             default:
                 return true;
-        }
-    }
-    
-    /**
-     * Performs LSPatch-safe DexKit operation
-     * @param operation Operation to perform
-     * @param params Operation parameters
-     * @return Operation result or null if not supported/failed
-     */
-    public static Object performSafeOperation(String operation, Object... params) {
-        if (!isInitialized()) {
-            Log.w(TAG, "DexKit not initialized, cannot perform operation: " + operation);
-            return null;
-        }
-        
-        if (!isOperationSupported(operation)) {
-            Log.w(TAG, "Operation not supported in current LSPatch environment: " + operation);
-            return null;
-        }
-        
-        try {
-            // Perform the operation with LSPatch-specific error handling
-            Log.d(TAG, "Performing LSPatch-safe operation: " + operation);
-            
-            // This would be implemented based on specific DexKit operations needed
-            // For now, we delegate to the bridge with error handling
-            
-            return null; // Implementation depends on specific operation
-            
-        } catch (Exception e) {
-            Log.e(TAG, "LSPatch-safe operation failed: " + operation + " - " + e.getMessage());
-            return null;
         }
     }
 }

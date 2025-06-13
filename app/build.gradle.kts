@@ -143,7 +143,8 @@ android {
 
 dependencies {
     implementation(libs.colorpicker)
-    implementation(libs.dexkit)
+    // DexKit es reemplazado por una implementación stub interna
+    // implementation(libs.dexkit)
     compileOnly(libs.libxposed.legacy)
 
     implementation(libs.androidx.activity)
