@@ -115,11 +115,46 @@ public class WppCore {
             initBridge(Utils.getApplication());
         }
 
+        // Initialize LSPatch service integration
+        if (LSPatchCompat.isLSPatchEnvironment()) {
+            XposedBridge.log("Initializing LSPatch service integration");
+            boolean serviceInit = LSPatchService.initialize(Utils.getApplication());
+            if (serviceInit) {
+                XposedBridge.log("LSPatch service integration successful");
+
+                // Check module status
+                boolean moduleLoaded = LSPatchService.isWaEnhancerLoaded();
+                if (moduleLoaded) {
+                    XposedBridge.log("WaEnhancer module detected as loaded in LSPatch");
+                } else {
+                    XposedBridge.log("WaEnhancer module not found in LSPatch modules list - this may be normal depending on LSPatch configuration");
+                }
+            } else {
+                XposedBridge.log("LSPatch service integration failed - some features may not work correctly");
+            }
+        }
     }
 
     public static void initBridge(Context context) throws Exception {
         var prefsCacheHooks = UnobfuscatorCache.getInstance().sPrefsCacheHooks;
         int preferredOrder = prefsCacheHooks.getInt("preferredOrder", 1); // 0 for ProviderClient first, 1 for BridgeClient first
+
+        // Check if we're in LSPatch environment and adapt accordingly
+        if (LSPatchCompat.isLSPatchEnvironment()) {
+            XposedBridge.log("Initializing bridge in LSPatch environment");
+
+            LSPatchCompat.LSPatchMode mode = LSPatchCompat.getCurrentMode();
+            if (mode == LSPatchCompat.LSPatchMode.LSPATCH_EMBEDDED) {
+                // In embedded mode, bridge service might not be available
+                // Try provider client first as it's more likely to work
+                preferredOrder = 0;
+                XposedBridge.log("LSPatch embedded mode detected, prioritizing ProviderClient");
+            } else if (mode == LSPatchCompat.LSPatchMode.LSPATCH_MANAGER) {
+                // In manager mode, bridge service should work better
+                preferredOrder = 1;
+                XposedBridge.log("LSPatch manager mode detected, prioritizing BridgeClient");
+            }
+        }
 
         boolean connected = false;
         if (preferredOrder == 0) {
@@ -139,11 +174,31 @@ public class WppCore {
         }
 
         if (!connected) {
-            throw new Exception(context.getString(ResId.string.bridge_error));
+            // In LSPatch environment, provide more specific error information
+            if (LSPatchCompat.isLSPatchEnvironment()) {
+                XposedBridge.log("Bridge connection failed in LSPatch environment");
+
+                // Try to initialize LSPatch bridge as fallback
+                if (LSPatchBridge.initialize(context)) {
+                    XposedBridge.log("LSPatch bridge initialized as fallback");
+                    return; // Don't throw exception if LSPatch bridge works
+                }
+
+                throw new Exception(context.getString(ResId.string.bridge_error) + " (LSPatch Mode: " + LSPatchCompat.getCurrentMode() + ")");
+            } else {
+                throw new Exception(context.getString(ResId.string.bridge_error));
+            }
         }
 
         // Update the preferred order if it changed
         prefsCacheHooks.edit().putInt("preferredOrder", preferredOrder).apply();
+
+        // Log successful connection
+        if (LSPatchCompat.isLSPatchEnvironment()) {
+            XposedBridge.log("Bridge successfully connected in LSPatch mode: " + LSPatchCompat.getCurrentMode());
+        } else {
+            XposedBridge.log("Bridge successfully connected in classic Xposed mode");
+        }
     }
 
 

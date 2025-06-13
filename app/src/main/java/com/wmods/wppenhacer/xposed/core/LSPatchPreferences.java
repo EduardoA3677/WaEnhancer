@@ -111,103 +111,169 @@ public class LSPatchPreferences implements SharedPreferences {
         }
     }
     
+    /**
+     * Initialize preferences for embedded LSPatch mode
+     */
     private void initEmbeddedModePreferences(Context context, String prefName) {
         try {
-            // In embedded mode, we can access preferences normally
-            mPreferences = context.getSharedPreferences(prefName, Context.MODE_PRIVATE);
+            // In embedded mode, preferences are usually accessible normally
+            mPreferences = context.getSharedPreferences(prefName, Context.MODE_WORLD_READABLE);
             
-            // If that fails, try to access the preferences file directly
-            if (mPreferences == null) {
-                File prefsDir = new File(context.getApplicationInfo().dataDir, "shared_prefs");
-                File prefsFile = new File(prefsDir, prefName + ".xml");
+            // Verify access works
+            mPreferences.getAll();
+            
+            Log.d(TAG, "Embedded mode preferences initialized successfully");
+            
+        } catch (Exception e) {
+            Log.w(TAG, "Failed to use standard preferences in embedded mode, trying file-based: " + e.getMessage());
+            
+            // Fallback to file-based preferences
+            try {
+                String prefsPath = LSPatchService.getPreferencesPath(BuildConfig.APPLICATION_ID);
+                if (prefsPath != null) {
+                    mPreferences = new LSPatchPreferencesImpl(prefsPath + "/" + prefName + ".xml");
+                } else {
+                    // Ultimate fallback
+                    String dataDir = context.getApplicationInfo().dataDir;
+                    String prefsFile = dataDir + "/shared_prefs/" + prefName + ".xml";
+                    mPreferences = new LSPatchPreferencesImpl(prefsFile);
+                }
                 
-                if (prefsFile.exists()) {
-                    Log.d(TAG, "Accessing preferences file directly: " + prefsFile.getAbsolutePath());
-                    // Create a custom SharedPreferences implementation that reads from the file
-                    mPreferences = new FileBasedSharedPreferences(prefsFile);
+                Log.d(TAG, "File-based preferences initialized for embedded mode");
+                
+            } catch (Exception e2) {
+                throw new RuntimeException("Could not initialize preferences for LSPatch embedded mode", e2);
+            }
+        }
+    }
+    
+    /**
+     * Initialize preferences for manager LSPatch mode
+     */
+    private void initManagerModePreferences(Context context, String prefName) {
+        try {
+            // Try to use LSPatch bridge service for preferences
+            if (LSPatchBridge.isInitialized()) {
+                String prefsPath = LSPatchBridge.getPreferencesPath(BuildConfig.APPLICATION_ID);
+                if (prefsPath != null) {
+                    String prefsFile = prefsPath + "/" + prefName + ".xml";
+                    mPreferences = new LSPatchPreferencesImpl(prefsFile);
+                    
+                    Log.d(TAG, "Manager mode preferences initialized via bridge service");
+                    return;
                 }
             }
             
+            // Fallback to LSPatch service
+            String prefsPath = LSPatchService.getPreferencesPath(BuildConfig.APPLICATION_ID);
+            if (prefsPath != null) {
+                String prefsFile = prefsPath + "/" + prefName + ".xml";
+                mPreferences = new LSPatchPreferencesImpl(prefsFile);
+                
+                Log.d(TAG, "Manager mode preferences initialized via LSPatch service");
+                return;
+            }
+            
+            // Final fallback
+            mPreferences = context.getSharedPreferences(prefName, Context.MODE_WORLD_READABLE);
+            
+            Log.d(TAG, "Manager mode preferences initialized with standard method (fallback)");
+            
         } catch (Exception e) {
-            Log.e(TAG, "Failed to initialize embedded mode preferences: " + e.getMessage());
-            throw e;
+            throw new RuntimeException("Could not initialize preferences for LSPatch manager mode", e);
         }
     }
     
-    private void initManagerModePreferences(Context context, String prefName) {
+    /**
+     * Initialize preferences via LSPatch bridge service
+     */
+    private void initLSPatchPreferencesViaBridge(String prefName) {
         try {
-            // In manager mode, use the bridge service to access preferences
-            if (LSPatchCompat.handleBridgeService("getPreferences")) {
-                // Use bridge service
-                mPreferences = context.getSharedPreferences(prefName, Context.MODE_PRIVATE);
-            } else {
-                // Fallback to normal access
-                mPreferences = context.getSharedPreferences(prefName, Context.MODE_PRIVATE);
+            if (LSPatchBridge.isInitialized()) {
+                String prefsPath = LSPatchBridge.getPreferencesPath(BuildConfig.APPLICATION_ID);
+                if (prefsPath != null) {
+                    String prefsFile = prefsPath + "/" + prefName + ".xml";
+                    mPreferences = new LSPatchPreferencesImpl(prefsFile);
+                    
+                    Log.d(TAG, "Preferences initialized via LSPatch bridge");
+                    return;
+                }
+            }
+            
+            throw new Exception("LSPatch bridge not available or preferences path not found");
+            
+        } catch (Exception e) {
+            throw new RuntimeException("Could not initialize preferences via LSPatch bridge", e);
+        }
+    }
+    
+    /**
+     * Adapt XSharedPreferences for LSPatch compatibility
+     */
+    private void adaptXPreferencesForLSPatch() {
+        Log.d(TAG, "Adapting XSharedPreferences for LSPatch compatibility");
+        
+        try {
+            // In LSPatch, XSharedPreferences might not work properly
+            // Try to reload and check if it's functional
+            if (mXPreferences != null) {
+                mXPreferences.reload();
+                
+                // Test if we can read preferences
+                mXPreferences.getAll();
+                
+                Log.d(TAG, "XSharedPreferences appears to be functional in LSPatch");
             }
             
         } catch (Exception e) {
-            Log.e(TAG, "Failed to initialize manager mode preferences: " + e.getMessage());
-            throw e;
+            Log.w(TAG, "XSharedPreferences not functional in LSPatch, needs conversion: " + e.getMessage());
+            
+            // Try to convert to regular SharedPreferences
+            try {
+                Context context = getCurrentContext();
+                if (context != null) {
+                    String prefName = BuildConfig.APPLICATION_ID + "_preferences";
+                    mPreferences = context.getSharedPreferences(prefName, Context.MODE_WORLD_READABLE);
+                    mXPreferences = null; // Clear non-functional XSharedPreferences
+                    
+                    Log.d(TAG, "Successfully converted XSharedPreferences to regular SharedPreferences");
+                }
+            } catch (Exception e2) {
+                Log.e(TAG, "Failed to convert XSharedPreferences: " + e2.getMessage());
+            }
         }
     }
     
-    private void initLSPatchPreferencesViaBridge(String prefName) {
+    /**
+     * Get current context for preferences operations
+     */
+    private Context getCurrentContext() {
         try {
-            // Use LSPatch bridge service to get preferences
-            Log.d(TAG, "Accessing preferences via LSPatch bridge service");
-            
-            // This would be implemented with actual LSPatch bridge service calls
-            // For now, we'll use a placeholder implementation
-            
+            Class<?> activityThreadClass = Class.forName("android.app.ActivityThread");
+            Object activityThread = activityThreadClass.getMethod("currentActivityThread").invoke(null);
+            return (Context) activityThreadClass.getMethod("getApplication").invoke(activityThread);
         } catch (Exception e) {
-            Log.e(TAG, "Failed to access preferences via bridge: " + e.getMessage());
-            throw e;
+            return null;
         }
     }
     
-    private void adaptXPreferencesForLSPatch() {
-        if (mXPreferences == null) return;
-        
-        try {
-            // Apply LSPatch specific adaptations to XSharedPreferences
-            mXPreferences.makeWorldReadable();
-            mXPreferences.reload();
-            
-            // Test if preferences are accessible
-            mXPreferences.getAll();
-            
-            Log.d(TAG, "XSharedPreferences adapted for LSPatch successfully");
-            
-        } catch (Exception e) {
-            Log.w(TAG, "XSharedPreferences adaptation failed: " + e.getMessage());
-            // Create a fallback implementation
-            createFallbackPreferences();
-        }
-    }
-    
-    private void createFallbackPreferences() {
-        Log.d(TAG, "Creating fallback preferences implementation");
-        
-        // Create a minimal SharedPreferences implementation with default values
-        mPreferences = new FallbackSharedPreferences();
-    }
-    
+    // =============================================================================
     // SharedPreferences interface implementation
+    // =============================================================================
     
     @Override
     public Map<String, ?> getAll() {
-        if (mIsLSPatch && mPreferences != null) {
+        if (mPreferences != null) {
             return mPreferences.getAll();
         } else if (mXPreferences != null) {
             return mXPreferences.getAll();
         }
-        return null;
+        return new java.util.HashMap<>();
     }
     
-    @Nullable
     @Override
-    public String getString(String key, @Nullable String defValue) {
-        if (mIsLSPatch && mPreferences != null) {
+    public String getString(String key, String defValue) {
+        if (mPreferences != null) {
             return mPreferences.getString(key, defValue);
         } else if (mXPreferences != null) {
             return mXPreferences.getString(key, defValue);
@@ -215,10 +281,9 @@ public class LSPatchPreferences implements SharedPreferences {
         return defValue;
     }
     
-    @Nullable
     @Override
-    public Set<String> getStringSet(String key, @Nullable Set<String> defValues) {
-        if (mIsLSPatch && mPreferences != null) {
+    public Set<String> getStringSet(String key, Set<String> defValues) {
+        if (mPreferences != null) {
             return mPreferences.getStringSet(key, defValues);
         } else if (mXPreferences != null) {
             return mXPreferences.getStringSet(key, defValues);
@@ -228,7 +293,7 @@ public class LSPatchPreferences implements SharedPreferences {
     
     @Override
     public int getInt(String key, int defValue) {
-        if (mIsLSPatch && mPreferences != null) {
+        if (mPreferences != null) {
             return mPreferences.getInt(key, defValue);
         } else if (mXPreferences != null) {
             return mXPreferences.getInt(key, defValue);
@@ -238,7 +303,7 @@ public class LSPatchPreferences implements SharedPreferences {
     
     @Override
     public long getLong(String key, long defValue) {
-        if (mIsLSPatch && mPreferences != null) {
+        if (mPreferences != null) {
             return mPreferences.getLong(key, defValue);
         } else if (mXPreferences != null) {
             return mXPreferences.getLong(key, defValue);
@@ -248,7 +313,7 @@ public class LSPatchPreferences implements SharedPreferences {
     
     @Override
     public float getFloat(String key, float defValue) {
-        if (mIsLSPatch && mPreferences != null) {
+        if (mPreferences != null) {
             return mPreferences.getFloat(key, defValue);
         } else if (mXPreferences != null) {
             return mXPreferences.getFloat(key, defValue);
@@ -258,7 +323,7 @@ public class LSPatchPreferences implements SharedPreferences {
     
     @Override
     public boolean getBoolean(String key, boolean defValue) {
-        if (mIsLSPatch && mPreferences != null) {
+        if (mPreferences != null) {
             return mPreferences.getBoolean(key, defValue);
         } else if (mXPreferences != null) {
             return mXPreferences.getBoolean(key, defValue);
@@ -268,7 +333,7 @@ public class LSPatchPreferences implements SharedPreferences {
     
     @Override
     public boolean contains(String key) {
-        if (mIsLSPatch && mPreferences != null) {
+        if (mPreferences != null) {
             return mPreferences.contains(key);
         } else if (mXPreferences != null) {
             return mXPreferences.contains(key);
@@ -278,55 +343,90 @@ public class LSPatchPreferences implements SharedPreferences {
     
     @Override
     public Editor edit() {
-        if (mIsLSPatch && mPreferences != null) {
+        if (mPreferences != null) {
             return mPreferences.edit();
-        } else if (mXPreferences != null) {
-            // XSharedPreferences doesn't support editing
-            Log.w(TAG, "Edit operation not supported on XSharedPreferences");
+        } else {
+            Log.w(TAG, "Edit not supported on XSharedPreferences in LSPatch mode");
             return new NoOpEditor();
         }
-        return new NoOpEditor();
     }
     
     @Override
     public void registerOnSharedPreferenceChangeListener(OnSharedPreferenceChangeListener listener) {
-        if (mIsLSPatch && mPreferences != null) {
+        if (mPreferences != null) {
             mPreferences.registerOnSharedPreferenceChangeListener(listener);
-        } else if (mXPreferences != null) {
-            mXPreferences.registerOnSharedPreferenceChangeListener(listener);
+        } else {
+            Log.w(TAG, "Change listeners not supported on XSharedPreferences in LSPatch mode");
         }
     }
     
     @Override
     public void unregisterOnSharedPreferenceChangeListener(OnSharedPreferenceChangeListener listener) {
-        if (mIsLSPatch && mPreferences != null) {
+        if (mPreferences != null) {
             mPreferences.unregisterOnSharedPreferenceChangeListener(listener);
-        } else if (mXPreferences != null) {
-            mXPreferences.unregisterOnSharedPreferenceChangeListener(listener);
         }
     }
     
     /**
-     * Reloads preferences if supported
+     * Check if this preferences instance is functional
      */
-    public void reload() {
-        if (mXPreferences != null) {
-            mXPreferences.reload();
+    public boolean isFunctional() {
+        try {
+            getAll();
+            return true;
+        } catch (Exception e) {
+            return false;
         }
-        // Regular SharedPreferences don't need explicit reload
     }
     
     /**
-     * Gets the underlying XSharedPreferences if available
+     * Get underlying XSharedPreferences (for compatibility)
      */
     public XSharedPreferences getXSharedPreferences() {
         return mXPreferences;
     }
     
     /**
-     * Checks if this instance is using LSPatch preferences
+     * Force reload preferences (useful for XSharedPreferences)
      */
-    public boolean isUsingLSPatch() {
-        return mIsLSPatch && mPreferences != null;
+    public void reload() {
+        if (mXPreferences != null) {
+            mXPreferences.reload();
+        }
+    }
+    
+    /**
+     * No-op editor for cases where editing is not supported
+     */
+    private static class NoOpEditor implements Editor {
+        @Override
+        public Editor putString(String key, String value) { return this; }
+        
+        @Override
+        public Editor putStringSet(String key, Set<String> values) { return this; }
+        
+        @Override
+        public Editor putInt(String key, int value) { return this; }
+        
+        @Override
+        public Editor putLong(String key, long value) { return this; }
+        
+        @Override
+        public Editor putFloat(String key, float value) { return this; }
+        
+        @Override
+        public Editor putBoolean(String key, boolean value) { return this; }
+        
+        @Override
+        public Editor remove(String key) { return this; }
+        
+        @Override
+        public Editor clear() { return this; }
+        
+        @Override
+        public boolean commit() { return false; }
+        
+        @Override
+        public void apply() { }
     }
 }

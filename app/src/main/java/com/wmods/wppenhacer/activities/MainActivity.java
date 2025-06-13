@@ -16,6 +16,7 @@ import androidx.viewpager2.widget.ViewPager2;
 import com.google.android.material.navigation.NavigationBarView;
 import com.waseemsabir.betterypermissionhelper.BatteryPermissionHelper;
 import com.wmods.wppenhacer.App;
+import com.wmods.wppenhacer.BuildConfig;
 import com.wmods.wppenhacer.R;
 import com.wmods.wppenhacer.activities.base.BaseActivity;
 import com.wmods.wppenhacer.adapter.MainPagerAdapter;
@@ -134,9 +135,34 @@ public class MainActivity extends BaseActivity {
     }
 
     public static boolean isXposedEnabled() {
-        // Try to detect LSPatch environment
+        // Use the new LSPatch-compatible module status detection
         try {
-            // Check for LSPatch classes
+            LSPatchModuleStatus.ModuleStatus status = LSPatchModuleStatus.getCurrentStatus();
+
+            // Log detailed status for debugging
+            if (BuildConfig.DEBUG) {
+                android.util.Log.d("WaEnhancer-MainActivity",
+                        "Module status check:\n" + LSPatchModuleStatus.getDetailedStatus());
+            }
+
+            return status.isActive();
+
+        } catch (Exception e) {
+            // Fallback to the original detection method
+            android.util.Log.w("WaEnhancer-MainActivity",
+                    "Error with new status detection, falling back: " + e.getMessage());
+
+            return isXposedEnabledFallback();
+        }
+    }
+
+    /**
+     * Fallback detection method (original implementation enhanced)
+     */
+    private static boolean isXposedEnabledFallback() {
+        // Try to detect LSPatch environment first (most reliable)
+        try {
+            // Check for LSPatch loader classes
             Class.forName("org.lsposed.lspatch.loader.LSPApplication");
             return true;
         } catch (ClassNotFoundException e1) {
@@ -152,17 +178,88 @@ public class MainActivity extends BaseActivity {
                         Class.forName("org.lsposed.lspatch.service.RemoteApplicationService");
                         return true;
                     } catch (ClassNotFoundException e4) {
+                        // Check for LSPatch-specific system properties
+                        try {
+                            String lspatchMarker = System.getProperty("lspatch.enabled");
+                            if ("true".equals(lspatchMarker)) {
+                                return true;
+                            }
+                        } catch (Exception e5) {
+                            // Ignore property access errors
+                        }
+
+                        // Check for LSPatch process markers
+                        try {
+                            // LSPatch sometimes sets specific environment variables
+                            String lspatchEnv = System.getenv("LSPATCH_VERSION");
+                            if (lspatchEnv != null && !lspatchEnv.isEmpty()) {
+                                return true;
+                            }
+                        } catch (Exception e6) {
+                            // Ignore environment access errors
+                        }
+
                         // Check for classic Xposed
                         try {
                             Class.forName("de.robv.android.xposed.XposedBridge");
-                            return true;
-                        } catch (ClassNotFoundException e5) {
-                            // Neither LSPatch nor Xposed detected
-                            return false;
+                            // Additional check to ensure it's actually working
+                            try {
+                                Class<?> xposedBridge = Class.forName("de.robv.android.xposed.XposedBridge");
+                                java.lang.reflect.Method getXposedVersion = xposedBridge.getMethod("getXposedVersion");
+                                Object version = getXposedVersion.invoke(null);
+                                return version != null;
+                            } catch (Exception e7) {
+                                // If we can load the class but not call methods, it might still be active
+                                return true;
+                            }
+                        } catch (ClassNotFoundException e7) {
+                            // Check for LSPosed (modern Xposed)
+                            try {
+                                Class.forName("org.lsposed.lspd.core.Startup");
+                                return true;
+                            } catch (ClassNotFoundException e8) {
+                                // Final fallback: check for known hook indicators
+                                try {
+                                    // Look for signs that hooks are active
+                                    Class<?> thisClass = MainActivity.class;
+                                    java.lang.reflect.Method[] methods = thisClass.getDeclaredMethods();
+                                    for (java.lang.reflect.Method method : methods) {
+                                        if (method.getName().equals("isXposedEnabled")) {
+                                            // Check if the method has been hooked by examining stack trace
+                                            StackTraceElement[] stack = Thread.currentThread().getStackTrace();
+                                            for (StackTraceElement element : stack) {
+                                                if (element.getClassName().contains("Xposed") ||
+                                                        element.getClassName().contains("LSPatch") ||
+                                                        element.getClassName().contains("lspatch")) {
+                                                    return true;
+                                                }
+                                            }
+                                            break;
+                                        }
+                                    }
+                                } catch (Exception e9) {
+                                    // Ignore reflection errors
+                                }
+
+                                // Neither LSPatch nor Xposed detected
+                                return false;
+                            }
                         }
                     }
                 }
             }
+        }
+    }
+
+    /**
+     * Get human-readable module status for display in UI
+     */
+    public static String getModuleStatusText() {
+        try {
+            LSPatchModuleStatus.ModuleStatus status = LSPatchModuleStatus.getCurrentStatus();
+            return status.getDisplayName();
+        } catch (Exception e) {
+            return isXposedEnabled() ? "Active" : "Inactive";
         }
     }
 

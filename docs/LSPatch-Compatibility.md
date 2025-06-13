@@ -1,169 +1,266 @@
-# LSPatch Compatibility Guide for WaEnhancer
+# WaEnhancer LSPatch Compatibility Guide
 
 ## Overview
 
-WaEnhancer now includes full compatibility with LSPatch, allowing it to run without root access by patching WhatsApp APKs directly. LSPatch is a rootless implementation of the Xposed framework that works by modifying app APKs to include the framework and modules.
+WaEnhancer has been updated to provide full compatibility with LSPatch, a rootless implementation of the Xposed framework. This guide explains the changes made and how to use WaEnhancer with LSPatch.
 
-## Features
+## What is LSPatch?
 
-### LSPatch Compatibility Layer
+LSPatch is a framework that allows running Xposed modules without root access by directly patching APK files. It provides two main modes:
 
-- **Automatic Detection**: WaEnhancer automatically detects when running in an LSPatch environment
-- **Mode Detection**: Supports both embedded mode (modules included in APK) and manager mode (modules managed externally)
-- **Optimized Hooks**: Applies LSPatch-specific optimizations for better stability
-- **Error Recovery**: Includes enhanced error handling for LSPatch environments
+1. **Embedded Mode**: The module is embedded directly into the target APK
+2. **Manager Mode**: Uses an external LSPatch manager application
 
-### Supported LSPatch Features
+## WaEnhancer LSPatch Compatibility Features
 
-- ✅ **Signature Bypass**: Built-in signature verification bypass
-- ✅ **Embedded Mode**: Modules embedded directly in the patched APK
-- ✅ **Manager Mode**: Modules managed through LSPatch Manager app
-- ✅ **Resource Hooks**: Support for resource modification (mode-dependent)
-- ❌ **System Server Hooks**: Not supported (LSPatch limitation)
+### 1. Enhanced Detection System
 
-### WaEnhancer Features in LSPatch
+WaEnhancer now includes multiple detection methods to reliably identify LSPatch environments:
 
-All WaEnhancer features are compatible with LSPatch:
+- **Class Availability Checks**: Detects LSPatch loader and service classes
+- **System Properties**: Checks for LSPatch-specific system properties
+- **Environment Variables**: Looks for LSPatch environment markers
+- **Asset Detection**: Scans for LSPatch configuration files and assets
+- **Stack Trace Analysis**: Examines call stacks for LSPatch signatures
+- **Native Library Detection**: Searches for LSPatch native libraries
 
-- Privacy features (Hide seen, Anti-revoke, etc.)
-- Media features (Download status, View once, etc.)
-- Customization features (Custom themes, Bubble colors, etc.)
-- General features (Chat limits, New chat, etc.)
+### 2. Adaptive Service Management
 
-## Installation Methods
+The bridge service system has been enhanced to work with both LSPatch modes:
 
-### Method 1: Using LSPatch Manager
+- **Embedded Mode**: Prioritizes ProviderClient and LocalApplicationService
+- **Manager Mode**: Prioritizes BridgeClient and RemoteApplicationService
+- **Fallback Mechanisms**: Automatically falls back to working alternatives
 
-1. Install LSPatch Manager from GitHub
-2. Install WaEnhancer APK normally
-3. Use LSPatch Manager to patch WhatsApp with WaEnhancer module
-4. Install the patched WhatsApp APK
+### 3. LSPatch-Compatible Preferences
 
-### Method 2: Command Line LSPatch
+A new `LSPatchPreferences` wrapper handles shared preferences access:
 
-1. Download LSPatch CLI tools
-2. Use command: `java -jar lspatch.jar --embed waenhancer.apk whatsapp.apk`
-3. Install the generated patched APK
+- **Traditional Xposed**: Uses `XSharedPreferences` normally
+- **LSPatch Embedded**: Uses file-based preference access
+- **LSPatch Manager**: Uses LSPatch service for preference access
+- **Automatic Conversion**: Converts XSharedPreferences to compatible format
 
-### Method 3: Pre-patched APK
+### 4. Optimized Hook Management
 
-1. Download a pre-patched WhatsApp APK with WaEnhancer
-2. Install directly (no additional steps required)
+LSPatch-specific optimizations for better hook stability:
 
-## Configuration
+- **Conservative Memory Usage**: Reduced memory footprint
+- **Enhanced Error Recovery**: Better handling of hook failures
+- **Priority-based Hook Registration**: Optimized hook order for LSPatch
 
-### LSPatch-Specific Settings
+### 5. Feature Compatibility Matrix
 
-WaEnhancer includes several LSPatch-specific optimizations that are automatically applied:
+| Feature | Classic Xposed | LSPatch Embedded | LSPatch Manager |
+|---------|----------------|------------------|-----------------|
+| Core Features | ✅ Full | ✅ Full | ✅ Full |
+| Resource Hooks | ✅ Full | ⚠️ Limited | ✅ Full |
+| System Hooks | ✅ Full | ❌ Disabled | ❌ Disabled |
+| Bridge Service | ✅ Full | ⚠️ Fallback | ✅ Full |
+| Preferences | ✅ Full | ✅ Adapted | ✅ Full |
+| Bootloader Spoofer | ✅ Full | ✅ Compatible | ✅ Compatible |
 
-- **Hook Stability**: Enhanced hook stability for non-root environments
-- **Memory Conservation**: Reduced memory usage in LSPatch environments
-- **Error Recovery**: Graceful handling of LSPatch-specific errors
-- **Resource Fallbacks**: Alternative resource handling when standard resource hooks are unavailable
+## Installation and Usage
+
+### Using with LSPatch
+
+1. **Patch WhatsApp with LSPatch**:
+   - Download LSPatch manager
+   - Patch WhatsApp APK with WaEnhancer embedded
+   - Install the patched APK
+
+2. **Verify Installation**:
+   - Open WaEnhancer settings
+   - Check the module status (should show "Active (LSPatch Embedded)" or "Active (LSPatch Manager)")
+
+3. **Configure Features**:
+   - All core features work the same as in traditional Xposed
+   - Some advanced features may have limitations (see compatibility matrix)
+
+### Troubleshooting LSPatch Issues
+
+#### Module Shows as "Inactive"
+
+1. **Check LSPatch Installation**:
+   ```
+   - Ensure WhatsApp was properly patched
+   - Verify LSPatch manager is installed (for manager mode)
+   - Check that WaEnhancer is embedded in the patched APK
+   ```
+
+2. **Force Status Refresh**:
+   - Open WaEnhancer settings
+   - The status should update automatically
+   - Look for detailed status in logs
+
+3. **Check Logs**:
+   ```
+   adb logcat | grep -E "(WaEnhancer|LSPatch)"
+   ```
+
+#### Features Not Working
+
+1. **Check Feature Compatibility**:
+   - Some system-level features are disabled in LSPatch
+   - Resource hooks may have limitations
+   - Check the compatibility matrix above
+
+2. **Verify Bridge Service**:
+   - The bridge service may use fallback methods in LSPatch
+   - Check if ProviderClient is working as alternative
+
+3. **Preference Issues**:
+   - LSPatch uses different preference access methods
+   - Settings should automatically adapt
+
+## Technical Implementation Details
+
+### LSPatch Detection Flow
+
+```java
+// Primary detection: LSPatch classes
+if (isClassAvailable("org.lsposed.lspatch.loader.LSPApplication")) {
+    return LSPatchMode.LSPATCH_EMBEDDED;
+}
+
+// Secondary detection: Service classes
+if (isClassAvailable("org.lsposed.lspatch.service.LocalApplicationService")) {
+    return LSPatchMode.LSPATCH_EMBEDDED;
+}
+
+// Additional checks: properties, environment, assets...
+```
+
+### Service Initialization Priority
+
+```java
+// Embedded Mode Priority
+1. LocalApplicationService
+2. ProviderClient
+3. BridgeClient
+
+// Manager Mode Priority  
+1. RemoteApplicationService
+2. BridgeClient
+3. ProviderClient
+```
+
+### Preference Access Adaptation
+
+```java
+// LSPatch environment
+if (LSPatchCompat.isLSPatchEnvironment()) {
+    // Use LSPatch-compatible preference access
+    preferences = new LSPatchPreferences(context);
+} else {
+    // Use traditional XSharedPreferences
+    preferences = new XSharedPreferences(packageName);
+}
+```
+
+## Code Changes Summary
+
+### New Classes Added
+
+1. **`LSPatchCompat`**: Main compatibility detection and management
+2. **`LSPatchService`**: Direct integration with LSPatch services
+3. **`LSPatchPreferences`**: Preferences wrapper for LSPatch compatibility
+4. **`LSPatchPreferencesImpl`**: File-based preferences implementation
+5. **`LSPatchBridge`**: Bridge functionality for LSPatch
+6. **`LSPatchHookWrapper`**: Hook optimization for LSPatch
+7. **`LSPatchModuleStatus`**: Enhanced module status detection
+8. **`LSPatchConfig`**: Configuration management for LSPatch
+
+### Modified Classes
+
+1. **`MainActivity`**: Enhanced module detection
+2. **`WppXposed`**: LSPatch initialization and compatibility checks
+3. **`WppCore`**: Bridge service adaptation for LSPatch
+4. **`FeatureLoader`**: LSPatch-aware feature loading
+
+### Configuration Files
+
+1. **`lspatch_config.json`**: Feature compatibility matrix
+2. **Updated manifests**: LSPatch-specific service declarations
+
+## Migration Guide
+
+### For Users
+
+No migration is needed - the app automatically detects and adapts to the environment.
+
+### For Developers
+
+1. **Use New Detection APIs**:
+   ```java
+   // Old way
+   if (isXposedActive()) { ... }
+   
+   // New way
+   LSPatchModuleStatus.ModuleStatus status = LSPatchModuleStatus.getCurrentStatus();
+   if (status.isActive()) { ... }
+   ```
+
+2. **Check Feature Availability**:
+   ```java
+   if (LSPatchCompat.isFeatureAvailable("SYSTEM_HOOKS")) {
+       // Safe to use system hooks
+   }
+   ```
+
+3. **Use Compatible Preferences**:
+   ```java
+   // Automatically adapts to environment
+   LSPatchPreferences prefs = new LSPatchPreferences(context);
+   ```
+
+## Limitations and Known Issues
+
+### LSPatch Embedded Mode
+- System hooks (ScopeHook, AndroidPermissions) are disabled for security
+- Resource hooks may have limited functionality
+- Bridge service uses fallback mechanisms
+
+### LSPatch Manager Mode
+- Requires LSPatch manager app to be installed
+- Some advanced features may need additional permissions
+- Bridge service should work normally
+
+### General
+- Bootloader spoofer requires additional verification
+- Some Xposed APIs may behave differently
+- Performance may be slightly different from traditional Xposed
+
+## Support and Debugging
 
 ### Debug Information
 
-Enable debug logging to see LSPatch-specific information:
+Enable debug mode to get detailed status information:
 
-1. Open WaEnhancer settings
-2. Go to General → Advanced
-3. Enable "Enable Logs"
-4. Check logcat for LSPatch-related messages tagged with `[LSPatch]`
-
-## Troubleshooting
+```java
+String detailedStatus = LSPatchModuleStatus.getDetailedStatus();
+Log.d("WaEnhancer", detailedStatus);
+```
 
 ### Common Issues
 
-**Issue**: WaEnhancer features not working after LSPatch installation
-**Solution**:
+1. **"Module Desactivado" Message**: 
+   - Check that WhatsApp was properly patched with LSPatch
+   - Verify WaEnhancer is embedded in the patched APK
+   - Check LSPatch manager installation (for manager mode)
 
-- Ensure you're using a compatible LSPatch version (0.6+)
-- Check that WaEnhancer was properly embedded in the patch
-- Verify that the patched APK was signed correctly
+2. **Features Not Working**:
+   - Check feature compatibility matrix
+   - Verify bridge service is connected
+   - Check logs for specific error messages
 
-**Issue**: Resource-related features not working
-**Solution**:
+3. **Settings Not Saving**:
+   - LSPatch uses different preference mechanisms
+   - Check preference adapter initialization
+   - Verify file permissions for embedded mode
 
-- Some LSPatch modes have limited resource hook support
-- Check logs for resource hook availability warnings
-- Consider using embedded mode for full resource support
+## Conclusion
 
-**Issue**: App crashes on startup
-**Solution**:
+WaEnhancer now provides comprehensive LSPatch compatibility while maintaining full functionality with traditional Xposed frameworks. The automatic detection and adaptation systems ensure a seamless experience regardless of the underlying framework.
 
-- Ensure WhatsApp version is supported by WaEnhancer
-- Check that signature bypass is enabled in LSPatch
-- Try regenerating the patch with different settings
-
-### Verification
-
-To verify LSPatch compatibility is working:
-
-1. Open WhatsApp (patched with WaEnhancer)
-2. Check logcat for: `[WaEnhancer] Running in LSPatch mode`
-3. Look for LSPatch mode detection: `LSPATCH_EMBEDDED` or `LSPATCH_MANAGER`
-4. Verify feature availability messages
-
-## Technical Details
-
-### Architecture
-
-```
-WaEnhancer Module
-├── LSPatchCompat.java (Environment detection)
-├── LSPatchPreferences.java (Preferences handling)
-├── LSPatchBridge.java (Service integration)
-├── LSPatchConfig.java (Configuration management)
-├── LSPatchHookWrapper.java (Hook optimizations)
-└── FeatureLoader.java (Main initialization)
-```
-
-### Detection Mechanism
-
-WaEnhancer detects LSPatch through multiple methods:
-
-1. Class availability checks (LSPatch-specific classes)
-2. System property checks (`lspatch.enabled`)
-3. Environment variable checks (`LSPATCH_ACTIVE`)
-4. Asset file checks (`assets/lspatch/config.json`)
-
-### Hook Optimizations
-
-- **Priority Setting**: Higher priority for LSPatch hooks
-- **Verification**: Enhanced hook verification
-- **Timeout Handling**: Longer timeouts for hook operations
-- **Error Wrapping**: LSPatch-specific error handling
-
-## Version Compatibility
-
-### LSPatch Versions
-
-- **Minimum Required**: 0.6
-- **Recommended**: Latest stable release
-- **Tested With**: 0.6, 0.7, 0.8+
-
-### WhatsApp Versions
-
-All WhatsApp versions supported by WaEnhancer are compatible with LSPatch:
-
-- **WhatsApp**: 2.23.25.xx and newer
-- **WhatsApp Business**: 2.23.25.xx and newer
-
-## Support
-
-For LSPatch-specific issues:
-
-1. Check the troubleshooting section above
-2. Enable debug logging and check for LSPatch-related messages
-3. Report issues on the WaEnhancer GitHub repository with LSPatch version and logs
-4. For LSPatch framework issues, refer to the LSPatch project documentation
-
-## Development Notes
-
-For developers working with WaEnhancer and LSPatch:
-
-- Use `LSPatchCompat.isLSPatchEnvironment()` to detect LSPatch
-- Use `LSPatchHookWrapper` for optimized hooks
-- Check feature availability with `LSPatchCompat.isFeatureAvailable()`
-- Handle resource limitations gracefully in manager mode
-- Test with both embedded and manager modes
+For additional support or to report LSPatch-specific issues, please include the detailed status information from `LSPatchModuleStatus.getDetailedStatus()` in your bug reports.

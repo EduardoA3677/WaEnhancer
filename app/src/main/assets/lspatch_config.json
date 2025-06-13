@@ -1,0 +1,85 @@
+{
+  "lspatch_compatibility": {
+    "version": "1.0.0",
+    "supported_modes": [
+      "embedded",
+      "manager"
+    ],
+    "features": {
+      "RESOURCE_HOOKS": {
+        "available": true,
+        "description": "Resource hooks support",
+        "limitations": "May not work with all resource types in LSPatch",
+        "fallback": "Use alternative resource access methods"
+      },
+      "SYSTEM_HOOKS": {
+        "available": false,
+        "description": "System-level hooks (ScopeHook, AndroidPermissions)",
+        "limitations": "Not compatible with LSPatch due to security model",
+        "fallback": "Skip system hooks in LSPatch environment"
+      },
+      "BRIDGE_SERVICE": {
+        "available": true,
+        "description": "Bridge service communication",
+        "limitations": "May require fallback methods in embedded mode",
+        "fallback": "Use LSPatch services directly"
+      },
+      "XPOSED_PREFERENCES": {
+        "available": false,
+        "description": "Traditional XSharedPreferences",
+        "limitations": "Not functional in LSPatch",
+        "fallback": "Use LSPatchPreferences wrapper"
+      },
+      "BOOTLOADER_SPOOFER": {
+        "available": true,
+        "description": "Bootloader spoofing functionality",
+        "limitations": "Requires additional verification in LSPatch",
+        "fallback": "Enhanced compatibility checks"
+      },
+      "MODULE_DETECTION": {
+        "available": true,
+        "description": "Module activation detection",
+        "limitations": "Uses different detection methods",
+        "fallback": "LSPatch-specific module detection"
+      }
+    },
+    "optimizations": {
+      "hook_stability": {
+        "enabled": true,
+        "description": "Enhanced hook stability for LSPatch"
+      },
+      "memory_conservative": {
+        "enabled": true,
+        "description": "Conservative memory usage"
+      },
+      "error_recovery": {
+        "enabled": true,
+        "description": "Enhanced error recovery mechanisms"
+      },
+      "service_fallbacks": {
+        "enabled": true,
+        "description": "Fallback mechanisms for service communication"
+      }
+    },
+    "detection_methods": [
+      "class_availability",
+      "system_properties", 
+      "environment_variables",
+      "stack_trace_analysis",
+      "asset_detection",
+      "native_library_detection"
+    ],
+    "service_priorities": {
+      "embedded_mode": [
+        "LocalApplicationService",
+        "ProviderClient",
+        "BridgeClient"
+      ],
+      "manager_mode": [
+        "RemoteApplicationService", 
+        "BridgeClient",
+        "ProviderClient"
+      ]
+    }
+  }
+}

@@ -217,27 +217,31 @@ public class LSPatchCompat {
         }
     }
     
+    /**
+     * Enhanced LSPatch environment detection
+     * Checks multiple indicators to reliably detect LSPatch
+     */
     private static boolean detectLSPatchEnvironment() {
-        // Check for LSPatch loader classes (most reliable detection)
+        // Primary detection: Check for LSPatch loader classes (most reliable)
         if (isClassAvailable(LSPATCH_LOADER_CLASS) ||
             isClassAvailable(LSPATCH_METALOADER_CLASS)) {
             return true;
         }
         
-        // Check for LSPatch service classes
+        // Secondary detection: Check for LSPatch service classes
         if (isClassAvailable(LSPATCH_SERVICE_CLASS) ||
             isClassAvailable(LSPATCH_MODULE_SERVICE) ||
             isClassAvailable(LSPATCH_REMOTE_SERVICE)) {
             return true;
         }
         
-        // Check for LSPatch bridge and init classes
+        // Tertiary detection: Check for LSPatch bridge and init classes
         if (isClassAvailable(LSPATCH_BRIDGE_CLASS) ||
             isClassAvailable(LSPATCH_XPOSED_INIT)) {
             return true;
         }
         
-        // Check for LSPatch specific system properties
+        // Quaternary detection: Check for LSPatch specific system properties
         try {
             String lspatchMarker = System.getProperty("lspatch.enabled");
             if ("true".equals(lspatchMarker)) {
@@ -249,20 +253,14 @@ public class LSPatchCompat {
             if (lspatchVersion != null && !lspatchVersion.isEmpty()) {
                 return true;
             }
-            
-            // Check WaEnhancer specific LSPatch marker
-            String waEnhancerLSPatch = System.getProperty("waenhancer.lspatch.enabled");
-            if ("true".equals(waEnhancerLSPatch)) {
-                return true;
-            }
         } catch (Exception e) {
-            // System property access might be restricted
+            // Ignore property access errors
         }
         
-        // Check for LSPatch specific environment variables
+        // Quinary detection: Check for LSPatch environment variables
         try {
-            String lspatchEnv = System.getenv("LSPATCH_ACTIVE");
-            if ("1".equals(lspatchEnv)) {
+            String lspatchEnv = System.getenv("LSPATCH_VERSION");
+            if (lspatchEnv != null && !lspatchEnv.isEmpty()) {
                 return true;
             }
             
@@ -271,28 +269,75 @@ public class LSPatchCompat {
                 return true;
             }
         } catch (Exception e) {
-            // Environment access might be restricted
+            // Ignore environment access errors
         }
         
-        // Check for LSPatch config file in assets
+        // Senary detection: Check for LSPatch in stack trace
         try {
-            ClassLoader cl = Thread.currentThread().getContextClassLoader();
-            if (cl != null && cl.getResource(LSPATCH_CONFIG_PATH) != null) {
-                return true;
+            StackTraceElement[] stack = Thread.currentThread().getStackTrace();
+            for (StackTraceElement element : stack) {
+                String className = element.getClassName();
+                if (className.contains("lspatch") || 
+                    className.contains("LSPatch") ||
+                    className.startsWith("org.lsposed.lspatch")) {
+                    return true;
+                }
             }
         } catch (Exception e) {
-            // Resource access might fail
+            // Ignore stack trace access errors
         }
         
-        // Additional check: look for LSPatch specific manifest entries
+        // Septenary detection: Check for LSPatch-patched application characteristics
         try {
-            // This checks if the app was patched with LSPatch by looking for the meta loader
-            Class<?> appFactoryStub = Class.forName("org.lsposed.lspatch.metaloader.LSPAppComponentFactoryStub");
-            if (appFactoryStub != null) {
-                return true;
+            Context context = getCurrentContext();
+            if (context != null) {
+                // Check if the application has been patched by LSPatch
+                String sourceDir = context.getApplicationInfo().sourceDir;
+                
+                // LSPatch often modifies the APK structure
+                if (sourceDir != null && sourceDir.contains("lspatch")) {
+                    return true;
+                }
+                
+                // Check for LSPatch assets
+                try {
+                    String[] assets = context.getAssets().list("lspatch");
+                    if (assets != null && assets.length > 0) {
+                        return true;
+                    }
+                } catch (Exception e) {
+                    // Ignore asset access errors
+                }
+                
+                // Check for LSPatch configuration files
+                try {
+                    context.getAssets().open("lspatch/config.json");
+                    return true; // If we can open this file, we're definitely in LSPatch
+                } catch (Exception e) {
+                    // This is expected if not in LSPatch
+                }
             }
-        } catch (ClassNotFoundException e) {
-            // Not found, continue checking
+        } catch (Exception e) {
+            // Ignore context access errors
+        }
+        
+        // Final fallback: Check for the presence of known LSPatch artifacts
+        try {
+            // Look for LSPatch native libraries
+            String[] libPaths = {
+                "/data/app/*/lib/*/liblspatch.so",
+                "/system/lib*/liblspatch.so",
+                "/vendor/lib*/liblspatch.so"
+            };
+            
+            for (String libPath : libPaths) {
+                java.io.File libFile = new java.io.File(libPath);
+                if (libFile.exists()) {
+                    return true;
+                }
+            }
+        } catch (Exception e) {
+            // Ignore file system access errors
         }
         
         return false;
@@ -444,5 +489,25 @@ public class LSPatchCompat {
         Log.i(TAG, "Signature Bypass: " + isFeatureAvailable("SIGNATURE_BYPASS"));
         Log.i(TAG, "Bridge Service: " + isFeatureAvailable("BRIDGE_SERVICE"));
         Log.i(TAG, "=======================================");
+    }
+    
+    /**
+     * Get current context (helper method for detection)
+     */
+    private static Context getCurrentContext() {
+        try {
+            // Try to get context from ActivityThread
+            Class<?> activityThreadClass = Class.forName("android.app.ActivityThread");
+            Object activityThread = activityThreadClass.getMethod("currentActivityThread").invoke(null);
+            return (Context) activityThreadClass.getMethod("getApplication").invoke(activityThread);
+        } catch (Exception e) {
+            try {
+                // Fallback: try to get from AndroidAppHelper if available
+                Class<?> appHelperClass = Class.forName("android.app.AndroidAppHelper");
+                return (Context) appHelperClass.getMethod("currentApplication").invoke(null);
+            } catch (Exception e2) {
+                return null;
+            }
+        }
     }
 }

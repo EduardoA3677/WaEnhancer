@@ -39,10 +39,34 @@ public class WppXposed implements IXposedHookLoadPackage, IXposedHookInitPackage
     @NonNull
     public static LSPatchPreferences getPref() {
         if (pref == null) {
-            XSharedPreferences xprefs = new XSharedPreferences(BuildConfig.APPLICATION_ID, BuildConfig.APPLICATION_ID + "_preferences");
-            xprefs.makeWorldReadable();
-            xprefs.reload();
-            pref = new LSPatchPreferences(xprefs);
+            if (LSPatchCompat.isLSPatchEnvironment()) {
+                // In LSPatch environment, create LSPatch-compatible preferences
+                try {
+                    Context context = Utils.getApplication();
+                    pref = new LSPatchPreferences(context);
+                    
+                    // Verify the preferences are functional
+                    if (!pref.isFunctional()) {
+                        XposedBridge.log("LSPatch preferences not functional, trying XSharedPreferences fallback");
+                        XSharedPreferences xPrefs = new XSharedPreferences(BuildConfig.APPLICATION_ID);
+                        pref = new LSPatchPreferences(xPrefs);
+                    }
+                    
+                    XposedBridge.log("LSPatch preferences initialized successfully");
+                    
+                } catch (Exception e) {
+                    XposedBridge.log("Failed to initialize LSPatch preferences: " + e.getMessage());
+                    // Fallback to XSharedPreferences
+                    XSharedPreferences xPrefs = new XSharedPreferences(BuildConfig.APPLICATION_ID);
+                    xPrefs.makeWorldReadable();
+                    pref = new LSPatchPreferences(xPrefs);
+                }
+            } else {
+                // Traditional Xposed environment
+                XSharedPreferences xPrefs = new XSharedPreferences(BuildConfig.APPLICATION_ID);
+                xPrefs.makeWorldReadable();
+                pref = new LSPatchPreferences(xPrefs);
+            }
         }
         return pref;
     }
