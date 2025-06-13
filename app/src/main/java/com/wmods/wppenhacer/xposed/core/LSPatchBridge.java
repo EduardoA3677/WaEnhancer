@@ -84,6 +84,14 @@ public class LSPatchBridge {
             Log.d(TAG, "LocalApplicationService initialized");
         } catch (Exception e) {
             Log.w(TAG, "Could not initialize LocalApplicationService: " + e.getMessage());
+            // Try alternative initialization
+            try {
+                Class<?> loaderClass = Class.forName("org.lsposed.lspatch.loader.LSPApplication");
+                // LSPApplication doesn't need instantiation, it's a static loader
+                Log.d(TAG, "LSPApplication loader detected in embedded mode");
+            } catch (Exception e2) {
+                Log.w(TAG, "LSPApplication loader not found: " + e2.getMessage());
+            }
         }
     }
     
@@ -101,6 +109,8 @@ public class LSPatchBridge {
             Log.d(TAG, "RemoteApplicationService initialized");
         } catch (Exception e) {
             Log.w(TAG, "Could not initialize RemoteApplicationService: " + e.getMessage());
+            // In manager mode, service might not be available if LSPatch manager is not installed
+            Log.i(TAG, "Manager mode detected but RemoteApplicationService unavailable - this is normal if LSPatch manager is not installed");
         }
     }
     
@@ -148,53 +158,31 @@ public class LSPatchBridge {
                                         Class<?>[] parameterTypes, XC_MethodHook callback) {
         try {
             if (!LSPatchCompat.isLSPatchEnvironment()) {
-                // Use standard Xposed hook
-                XposedHelpers.findAndHookMethod(targetClass, methodName, parameterTypes[0], callback);
+                // Use standard Xposed hook for classic Xposed
+                Object[] hookParams = new Object[parameterTypes.length + 1];
+                System.arraycopy(parameterTypes, 0, hookParams, 0, parameterTypes.length);
+                hookParams[hookParams.length - 1] = callback;
+                
+                XposedHelpers.findAndHookMethod(targetClass, methodName, hookParams);
                 return true;
             }
             
-            // Apply LSPatch-specific hook with optimizations
-            Method targetMethod = targetClass.getDeclaredMethod(methodName, parameterTypes);
+            // Use LSPatch hook wrapper for better compatibility
+            Object[] hookParams = new Object[parameterTypes.length + 1];
+            System.arraycopy(parameterTypes, 0, hookParams, 0, parameterTypes.length);
+            hookParams[hookParams.length - 1] = callback;
             
-            // Create a wrapper callback that handles LSPatch specifics
-            XC_MethodHook lspatchCallback = new XC_MethodHook() {
-                @Override
-                protected void beforeHookedMethod(MethodHookParam param) throws Throwable {
-                    try {
-                        // Use safe callback invocation to avoid protected access issues
-                        LSPatchHookWrapper.callSafeBefore(callback, param);
-                    } catch (Exception e) {
-                        Log.w(TAG, "Hook execution error in LSPatch: " + e.getMessage());
-                        if (LSPatchCompat.getCurrentMode() == LSPatchCompat.LSPatchMode.LSPATCH_EMBEDDED) {
-                            // More lenient error handling in embedded mode
-                            Log.d(TAG, "Continuing execution despite error in embedded mode");
-                        } else {
-                            throw e;
-                        }
-                    }
-                }
-                
-                @Override
-                protected void afterHookedMethod(MethodHookParam param) throws Throwable {
-                    try {
-                        // Use safe callback invocation to avoid protected access issues
-                        LSPatchHookWrapper.callSafeAfter(callback, param);
-                    } catch (Exception e) {
-                        Log.w(TAG, "Hook execution error in LSPatch: " + e.getMessage());
-                        if (LSPatchCompat.getCurrentMode() == LSPatchCompat.LSPatchMode.LSPATCH_EMBEDDED) {
-                            Log.d(TAG, "Continuing execution despite error in embedded mode");
-                        } else {
-                            throw e;
-                        }
-                    }
-                }
-            };
+            XC_MethodHook.Unhook hook = LSPatchHookWrapper.hookMethod(targetClass, methodName, hookParams, callback);
             
-            XposedBridge.hookMethod(targetMethod, lspatchCallback);
-            
-            Log.d(TAG, "Successfully applied LSPatch-optimized hook for " + 
-                  targetClass.getSimpleName() + "." + methodName);
-            return true;
+            if (hook != null) {
+                Log.d(TAG, "Successfully applied LSPatch-optimized hook for " + 
+                      targetClass.getSimpleName() + "." + methodName);
+                return true;
+            } else {
+                Log.w(TAG, "LSPatch hook wrapper returned null for " + 
+                      targetClass.getSimpleName() + "." + methodName);
+                return false;
+            }
             
         } catch (Exception e) {
             Log.e(TAG, "Failed to apply LSPatch hook for " + 

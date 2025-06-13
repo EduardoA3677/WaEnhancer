@@ -218,14 +218,22 @@ public class LSPatchCompat {
     }
     
     private static boolean detectLSPatchEnvironment() {
-        // Check for LSPatch loader classes
+        // Check for LSPatch loader classes (most reliable detection)
         if (isClassAvailable(LSPATCH_LOADER_CLASS) ||
-            isClassAvailable(LSPATCH_METALOADER_CLASS) ||
-            isClassAvailable(LSPATCH_SERVICE_CLASS) ||
-            isClassAvailable(LSPATCH_BRIDGE_CLASS) ||
-            isClassAvailable(LSPATCH_XPOSED_INIT) ||
+            isClassAvailable(LSPATCH_METALOADER_CLASS)) {
+            return true;
+        }
+        
+        // Check for LSPatch service classes
+        if (isClassAvailable(LSPATCH_SERVICE_CLASS) ||
             isClassAvailable(LSPATCH_MODULE_SERVICE) ||
             isClassAvailable(LSPATCH_REMOTE_SERVICE)) {
+            return true;
+        }
+        
+        // Check for LSPatch bridge and init classes
+        if (isClassAvailable(LSPATCH_BRIDGE_CLASS) ||
+            isClassAvailable(LSPATCH_XPOSED_INIT)) {
             return true;
         }
         
@@ -239,6 +247,12 @@ public class LSPatchCompat {
             // Check for LSPatch version property
             String lspatchVersion = System.getProperty("lspatch.version");
             if (lspatchVersion != null && !lspatchVersion.isEmpty()) {
+                return true;
+            }
+            
+            // Check WaEnhancer specific LSPatch marker
+            String waEnhancerLSPatch = System.getProperty("waenhancer.lspatch.enabled");
+            if ("true".equals(waEnhancerLSPatch)) {
                 return true;
             }
         } catch (Exception e) {
@@ -270,36 +284,72 @@ public class LSPatchCompat {
             // Resource access might fail
         }
         
+        // Additional check: look for LSPatch specific manifest entries
+        try {
+            // This checks if the app was patched with LSPatch by looking for the meta loader
+            Class<?> appFactoryStub = Class.forName("org.lsposed.lspatch.metaloader.LSPAppComponentFactoryStub");
+            if (appFactoryStub != null) {
+                return true;
+            }
+        } catch (ClassNotFoundException e) {
+            // Not found, continue checking
+        }
+        
         return false;
     }
     
     private static LSPatchMode detectLSPatchMode() {
-        // Check if manager mode is active
+        // Check for manager mode first (RemoteApplicationService)
         if (isClassAvailable("org.lsposed.lspatch.service.RemoteApplicationService")) {
             return LSPatchMode.LSPATCH_MANAGER;
         }
         
-        // Check if embedded mode is active
+        // Check for embedded mode (LocalApplicationService) 
         if (isClassAvailable("org.lsposed.lspatch.service.LocalApplicationService")) {
             return LSPatchMode.LSPATCH_EMBEDDED;
         }
         
-        // Check for LSPatch meta loader (indicates patched APK)
+        // Check for LSPatch meta loader (indicates patched APK - embedded mode)
         if (isClassAvailable(LSPATCH_METALOADER_CLASS)) {
             return LSPatchMode.LSPATCH_EMBEDDED;
         }
         
-        // Check for manager package name in system
+        // Check for LSPatch loader (embedded mode)
+        if (isClassAvailable(LSPATCH_LOADER_CLASS)) {
+            return LSPatchMode.LSPATCH_EMBEDDED;
+        }
+        
+        // Check system properties for mode detection
         try {
             String managerPackage = System.getProperty("lspatch.manager.package");
             if ("org.lsposed.lspatch".equals(managerPackage)) {
+                return LSPatchMode.LSPATCH_MANAGER;
+            }
+            
+            String embeddedMode = System.getProperty("lspatch.embedded");
+            if ("true".equals(embeddedMode)) {
+                return LSPatchMode.LSPATCH_EMBEDDED;
+            }
+            
+            String managerMode = System.getProperty("lspatch.manager");
+            if ("true".equals(managerMode)) {
                 return LSPatchMode.LSPATCH_MANAGER;
             }
         } catch (Exception e) {
             // Property access might be restricted
         }
         
-        // Default to embedded mode if LSPatch is detected
+        // Check for embedded modules in assets (indicates embedded mode)
+        try {
+            ClassLoader cl = Thread.currentThread().getContextClassLoader();
+            if (cl != null && cl.getResource("assets/lspatch/modules") != null) {
+                return LSPatchMode.LSPATCH_EMBEDDED;
+            }
+        } catch (Exception e) {
+            // Resource access might fail
+        }
+        
+        // Default to embedded mode if LSPatch is detected but mode is unclear
         return LSPatchMode.LSPATCH_EMBEDDED;
     }
     

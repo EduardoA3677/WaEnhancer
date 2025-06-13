@@ -236,22 +236,42 @@ public class HomeFragment extends BaseFragment {
             try {
                 LSPatchCompat.init();
                 if (LSPatchCompat.isLSPatchEnvironment()) {
-                    String lspatchMode = LSPatchCompat.getCurrentMode().toString();
-                    binding.statusTitle.setText("LSPatch " + getString(R.string.module_enabled));
-                    binding.statusSummary.setText(String.format(getString(R.string.version_s) + " (LSPatch: %s)", 
-                                                 BuildConfig.VERSION_NAME, lspatchMode));
+                    LSPatchCompat.LSPatchMode currentMode = LSPatchCompat.getCurrentMode();
+                    String modeDisplay = "";
                     
-                    // Show warning color for LSPatch to indicate limited functionality
-                    binding.status.setCardBackgroundColor(activity.getColor(R.color.material_state_yellow));
+                    switch (currentMode) {
+                        case LSPATCH_EMBEDDED:
+                            modeDisplay = "Embedded";
+                            break;
+                        case LSPATCH_MANAGER:
+                            modeDisplay = "Manager";
+                            break;
+                        default:
+                            modeDisplay = "Unknown";
+                            break;
+                    }
+                    
+                    binding.statusTitle.setText("LSPatch " + getString(R.string.module_enabled));
+                    binding.statusSummary.setText(String.format("%s (LSPatch %s Mode)", 
+                                                 BuildConfig.VERSION_NAME, modeDisplay));
+                    
+                    // Show different colors based on LSPatch mode
+                    if (currentMode == LSPatchCompat.LSPatchMode.LSPATCH_EMBEDDED) {
+                        binding.status.setCardBackgroundColor(activity.getColor(R.color.material_state_green));
+                    } else {
+                        // Manager mode has more limitations
+                        binding.status.setCardBackgroundColor(activity.getColor(R.color.material_state_yellow));
+                    }
                 } else {
+                    // Classic Xposed/LSPosed
                     binding.statusTitle.setText("LSPosed " + getString(R.string.module_enabled));
-                    binding.statusSummary.setText(String.format(getString(R.string.version_s) + " (Full functionality)", 
+                    binding.statusSummary.setText(String.format("%s (Full functionality)", 
                                                  BuildConfig.VERSION_NAME));
                     binding.status.setCardBackgroundColor(activity.getColor(R.color.material_state_green));
                 }
             } catch (Exception e) {
                 // Fallback for environments where LSPatch classes aren't available
-                binding.statusTitle.setText(R.string.module_enabled);
+                binding.statusTitle.setText(getString(R.string.module_enabled));
                 binding.statusSummary.setText(String.format(getString(R.string.version_s), BuildConfig.VERSION_NAME));
                 binding.status.setCardBackgroundColor(activity.getColor(R.color.material_state_green));
             }

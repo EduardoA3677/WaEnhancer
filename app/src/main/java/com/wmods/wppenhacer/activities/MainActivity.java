@@ -134,7 +134,36 @@ public class MainActivity extends BaseActivity {
     }
 
     public static boolean isXposedEnabled() {
-        return false;
+        // Try to detect LSPatch environment
+        try {
+            // Check for LSPatch classes
+            Class.forName("org.lsposed.lspatch.loader.LSPApplication");
+            return true;
+        } catch (ClassNotFoundException e1) {
+            try {
+                Class.forName("org.lsposed.lspatch.metaloader.LSPAppComponentFactoryStub");
+                return true;
+            } catch (ClassNotFoundException e2) {
+                try {
+                    Class.forName("org.lsposed.lspatch.service.LocalApplicationService");
+                    return true;
+                } catch (ClassNotFoundException e3) {
+                    try {
+                        Class.forName("org.lsposed.lspatch.service.RemoteApplicationService");
+                        return true;
+                    } catch (ClassNotFoundException e4) {
+                        // Check for classic Xposed
+                        try {
+                            Class.forName("de.robv.android.xposed.XposedBridge");
+                            return true;
+                        } catch (ClassNotFoundException e5) {
+                            // Neither LSPatch nor Xposed detected
+                            return false;
+                        }
+                    }
+                }
+            }
+        }
     }
 
     @Override
