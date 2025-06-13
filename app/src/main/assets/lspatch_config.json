@@ -1,10 +1,7 @@
 {
   "lspatch_compatibility": {
     "version": "1.0.0",
-    "supported_modes": [
-      "embedded",
-      "manager"
-    ],
+    "supported_modes": ["embedded", "manager"],
     "features": {
       "RESOURCE_HOOKS": {
         "available": true,
@@ -63,23 +60,15 @@
     },
     "detection_methods": [
       "class_availability",
-      "system_properties", 
+      "system_properties",
       "environment_variables",
       "stack_trace_analysis",
       "asset_detection",
       "native_library_detection"
     ],
     "service_priorities": {
-      "embedded_mode": [
-        "LocalApplicationService",
-        "ProviderClient",
-        "BridgeClient"
-      ],
-      "manager_mode": [
-        "RemoteApplicationService", 
-        "BridgeClient",
-        "ProviderClient"
-      ]
+      "embedded_mode": ["LocalApplicationService", "ProviderClient", "BridgeClient"],
+      "manager_mode": ["RemoteApplicationService", "BridgeClient", "ProviderClient"]
     }
   }
 }

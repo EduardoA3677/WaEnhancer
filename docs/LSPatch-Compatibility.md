@@ -51,25 +51,27 @@ LSPatch-specific optimizations for better hook stability:
 
 ### 5. Feature Compatibility Matrix
 
-| Feature | Classic Xposed | LSPatch Embedded | LSPatch Manager |
-|---------|----------------|------------------|-----------------|
-| Core Features | ✅ Full | ✅ Full | ✅ Full |
-| Resource Hooks | ✅ Full | ⚠️ Limited | ✅ Full |
-| System Hooks | ✅ Full | ❌ Disabled | ❌ Disabled |
-| Bridge Service | ✅ Full | ⚠️ Fallback | ✅ Full |
-| Preferences | ✅ Full | ✅ Adapted | ✅ Full |
-| Bootloader Spoofer | ✅ Full | ✅ Compatible | ✅ Compatible |
+| Feature            | Classic Xposed | LSPatch Embedded | LSPatch Manager |
+| ------------------ | -------------- | ---------------- | --------------- |
+| Core Features      | ✅ Full        | ✅ Full          | ✅ Full         |
+| Resource Hooks     | ✅ Full        | ⚠️ Limited       | ✅ Full         |
+| System Hooks       | ✅ Full        | ❌ Disabled      | ❌ Disabled     |
+| Bridge Service     | ✅ Full        | ⚠️ Fallback      | ✅ Full         |
+| Preferences        | ✅ Full        | ✅ Adapted       | ✅ Full         |
+| Bootloader Spoofer | ✅ Full        | ✅ Compatible    | ✅ Compatible   |
 
 ## Installation and Usage
 
 ### Using with LSPatch
 
 1. **Patch WhatsApp with LSPatch**:
+
    - Download LSPatch manager
    - Patch WhatsApp APK with WaEnhancer embedded
    - Install the patched APK
 
 2. **Verify Installation**:
+
    - Open WaEnhancer settings
    - Check the module status (should show "Active (LSPatch Embedded)" or "Active (LSPatch Manager)")
 
@@ -82,6 +84,7 @@ LSPatch-specific optimizations for better hook stability:
 #### Module Shows as "Inactive"
 
 1. **Check LSPatch Installation**:
+
    ```
    - Ensure WhatsApp was properly patched
    - Verify LSPatch manager is installed (for manager mode)
@@ -89,6 +92,7 @@ LSPatch-specific optimizations for better hook stability:
    ```
 
 2. **Force Status Refresh**:
+
    - Open WaEnhancer settings
    - The status should update automatically
    - Look for detailed status in logs
@@ -101,11 +105,13 @@ LSPatch-specific optimizations for better hook stability:
 #### Features Not Working
 
 1. **Check Feature Compatibility**:
+
    - Some system-level features are disabled in LSPatch
    - Resource hooks may have limitations
    - Check the compatibility matrix above
 
 2. **Verify Bridge Service**:
+
    - The bridge service may use fallback methods in LSPatch
    - Check if ProviderClient is working as alternative
 
@@ -139,7 +145,7 @@ if (isClassAvailable("org.lsposed.lspatch.service.LocalApplicationService")) {
 2. ProviderClient
 3. BridgeClient
 
-// Manager Mode Priority  
+// Manager Mode Priority
 1. RemoteApplicationService
 2. BridgeClient
 3. ProviderClient
@@ -192,16 +198,18 @@ No migration is needed - the app automatically detects and adapts to the environ
 ### For Developers
 
 1. **Use New Detection APIs**:
+
    ```java
    // Old way
    if (isXposedActive()) { ... }
-   
+
    // New way
    LSPatchModuleStatus.ModuleStatus status = LSPatchModuleStatus.getCurrentStatus();
    if (status.isActive()) { ... }
    ```
 
 2. **Check Feature Availability**:
+
    ```java
    if (LSPatchCompat.isFeatureAvailable("SYSTEM_HOOKS")) {
        // Safe to use system hooks
@@ -217,16 +225,19 @@ No migration is needed - the app automatically detects and adapts to the environ
 ## Limitations and Known Issues
 
 ### LSPatch Embedded Mode
+
 - System hooks (ScopeHook, AndroidPermissions) are disabled for security
 - Resource hooks may have limited functionality
 - Bridge service uses fallback mechanisms
 
 ### LSPatch Manager Mode
+
 - Requires LSPatch manager app to be installed
 - Some advanced features may need additional permissions
 - Bridge service should work normally
 
 ### General
+
 - Bootloader spoofer requires additional verification
 - Some Xposed APIs may behave differently
 - Performance may be slightly different from traditional Xposed
@@ -244,12 +255,14 @@ Log.d("WaEnhancer", detailedStatus);
 
 ### Common Issues
 
-1. **"Module Desactivado" Message**: 
+1. **"Module Desactivado" Message**:
+
    - Check that WhatsApp was properly patched with LSPatch
    - Verify WaEnhancer is embedded in the patched APK
    - Check LSPatch manager installation (for manager mode)
 
 2. **Features Not Working**:
+
    - Check feature compatibility matrix
    - Verify bridge service is connected
    - Check logs for specific error messages
