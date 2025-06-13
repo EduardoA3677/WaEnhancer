@@ -26,6 +26,7 @@ import com.wmods.wppenhacer.R;
 import com.wmods.wppenhacer.activities.MainActivity;
 import com.wmods.wppenhacer.databinding.FragmentHomeBinding;
 import com.wmods.wppenhacer.ui.fragments.base.BaseFragment;
+import com.wmods.wppenhacer.ui.dialogs.LSPatchInfoDialog;
 import com.wmods.wppenhacer.utils.FilePicker;
 import com.wmods.wppenhacer.xposed.core.FeatureLoader;
 import com.wmods.wppenhacer.xposed.core.LSPatchCompat;
@@ -88,6 +89,17 @@ public class HomeFragment extends BaseFragment {
         binding.exportBtn.setOnClickListener(view -> saveConfigs(this.getContext()));
         binding.importBtn.setOnClickListener(view -> importConfigs(this.getContext()));
         binding.resetBtn.setOnClickListener(view -> resetConfigs(this.getContext()));
+        
+        // Add click listener for status card to show LSPatch info
+        binding.status.setOnClickListener(view -> {
+            try {
+                if (LSPatchCompat.isLSPatchEnvironment() && MainActivity.isXposedEnabled()) {
+                    LSPatchInfoDialog.newInstance().show(getParentFragmentManager(), "lspatch_info");
+                }
+            } catch (Exception e) {
+                // LSPatch classes not available, ignore
+            }
+        });
 
         return binding.getRoot();
     }
@@ -238,22 +250,28 @@ public class HomeFragment extends BaseFragment {
                 if (LSPatchCompat.isLSPatchEnvironment()) {
                     LSPatchCompat.LSPatchMode currentMode = LSPatchCompat.getCurrentMode();
                     String modeDisplay = "";
+                    String functionalityInfo = "";
                     
                     switch (currentMode) {
                         case LSPATCH_EMBEDDED:
-                            modeDisplay = "Embedded";
+                            modeDisplay = getString(R.string.lspatch_embedded_mode);
+                            functionalityInfo = getString(R.string.lspatch_limited_functionality);
                             break;
                         case LSPATCH_MANAGER:
-                            modeDisplay = "Manager";
+                            modeDisplay = getString(R.string.lspatch_manager_mode);
+                            functionalityInfo = getString(R.string.lspatch_limited_functionality);
                             break;
                         default:
-                            modeDisplay = "Unknown";
+                            modeDisplay = "LSPatch (Unknown Mode)";
+                            functionalityInfo = getString(R.string.lspatch_limited_functionality);
                             break;
                     }
                     
-                    binding.statusTitle.setText("LSPatch " + getString(R.string.module_enabled));
-                    binding.statusSummary.setText(String.format("%s (LSPatch %s Mode)", 
-                                                 BuildConfig.VERSION_NAME, modeDisplay));
+                    binding.statusTitle.setText(modeDisplay + " " + getString(R.string.module_enabled));
+                    binding.statusSummary.setText(String.format("%s\n%s\n• %s", 
+                                                 BuildConfig.VERSION_NAME, 
+                                                 functionalityInfo,
+                                                 getString(R.string.lspatch_system_hooks_disabled)));
                     
                     // Show different colors based on LSPatch mode
                     if (currentMode == LSPatchCompat.LSPatchMode.LSPATCH_EMBEDDED) {
@@ -262,11 +280,16 @@ public class HomeFragment extends BaseFragment {
                         // Manager mode has more limitations
                         binding.status.setCardBackgroundColor(activity.getColor(R.color.material_state_yellow));
                     }
+                    
+                    // Log compatibility info for debugging
+                    LSPatchCompat.logCompatibilityInfo();
+                    
                 } else {
                     // Classic Xposed/LSPosed
                     binding.statusTitle.setText("LSPosed " + getString(R.string.module_enabled));
-                    binding.statusSummary.setText(String.format("%s (Full functionality)", 
-                                                 BuildConfig.VERSION_NAME));
+                    binding.statusSummary.setText(String.format("%s\n%s", 
+                                                 BuildConfig.VERSION_NAME, 
+                                                 getString(R.string.lspatch_full_functionality)));
                     binding.status.setCardBackgroundColor(activity.getColor(R.color.material_state_green));
                 }
             } catch (Exception e) {

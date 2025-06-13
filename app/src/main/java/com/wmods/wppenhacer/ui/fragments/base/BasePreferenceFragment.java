@@ -22,6 +22,7 @@ import androidx.preference.PreferenceManager;
 
 import com.wmods.wppenhacer.App;
 import com.wmods.wppenhacer.BuildConfig;
+import com.wmods.wppenhacer.preference.LSPatchPreferenceManager;
 import com.wmods.wppenhacer.xposed.core.LSPatchCompat;
 import com.wmods.wppenhacer.xposed.utils.Utils;
 
@@ -51,9 +52,14 @@ public abstract class BasePreferenceFragment extends PreferenceFragmentCompat im
     @NonNull
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
+        View view = super.onCreateView(inflater, container, savedInstanceState);
+        
+        // Apply LSPatch compatibility filtering after preferences are loaded
+        applyLSPatchFiltering();
+        
         chanceStates(null);
         monitorPreference();
-        return super.onCreateView(inflater, container, savedInstanceState);
+        return view;
     }
 
     @Override
@@ -168,6 +174,19 @@ public abstract class BasePreferenceFragment extends PreferenceFragmentCompat im
                     break;
             }
 
+        }
+    }
+
+    /**
+     * Applies LSPatch compatibility filtering to preference screen
+     */
+    private void applyLSPatchFiltering() {
+        try {
+            if (getPreferenceScreen() != null) {
+                LSPatchPreferenceManager.filterPreferences(getPreferenceScreen(), requireContext());
+            }
+        } catch (Exception e) {
+            // LSPatch filtering failed, continue without it
         }
     }
 

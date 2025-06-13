@@ -1,53 +1,59 @@
-# WaEnhancer + LSPatch Integration
+# WaEnhancer LSPatch Compatibility
 
-[English](README.md) | [Português](README.pt-BR.md) | **LSPatch Guide**
+WaEnhancer is fully compatible with LSPatch, providing rootless Xposed functionality for WhatsApp enhancement without requiring root access.
 
-## Quick Start with LSPatch
+## What is LSPatch?
 
-LSPatch allows you to use WaEnhancer without root access by patching WhatsApp directly.
+LSPatch is a rootless implementation of the Xposed framework that allows running Xposed modules by patching APKs directly. This means you can use WaEnhancer without rooting your device.
 
-### Step 1: Download Requirements
+## Supported LSPatch Modes
 
-- [LSPatch Manager](https://github.com/LSPosed/LSPatch/releases) (latest version)
-- [WaEnhancer APK](../../releases) (this module)
-- WhatsApp APK (original from Google Play or APKMirror)
+### 1. Embedded Mode (Recommended)
 
-### Step 2: Patch WhatsApp
+- **Description**: The module is embedded directly into the WhatsApp APK
+- **Advantages**: Better performance, more stable, better feature support
+- **Limitations**: Requires repatching APK for updates
+- **Status**: ✅ Fully supported with most features available
 
-1. Install LSPatch Manager
-2. Open LSPatch Manager
-3. Select "New Patch"
-4. Choose your WhatsApp APK
-5. Add WaEnhancer module
-6. Select patch options:
-   - ✅ Signature bypass level 2 (recommended)
-   - ✅ Debuggable (for troubleshooting)
-   - Choose embedded mode for full features
-7. Create patch
+### 2. Manager Mode
 
-### Step 3: Install Patched App
+- **Description**: Module is loaded through LSPatch manager app
+- **Advantages**: Easier module management, no APK repatching needed
+- **Limitations**: More restrictions, limited resource modifications
+- **Status**: ⚠️ Supported with limitations
 
-1. Uninstall original WhatsApp (backup chats first!)
-2. Install the patched WhatsApp APK
-3. Restore your chats
-4. Open WaEnhancer settings to configure features
+## Feature Compatibility
 
-## Features Status in LSPatch
+### ✅ Fully Compatible Features
 
-| Feature Category     | LSPatch Support | Notes                                |
-| -------------------- | --------------- | ------------------------------------ |
-| 🔒 Privacy Features  | ✅ Full         | Hide seen, Anti-revoke, etc.         |
-| 📱 Media Features    | ✅ Full         | Download status, View once, etc.     |
-| 🎨 Customization     | ⚠️ Partial      | Resource-dependent features may vary |
-| ⚙️ General Features  | ✅ Full         | Chat limits, New chat, etc.          |
-| 🔧 Advanced Features | ✅ Full         | Tasker, Debug tools, etc.            |
+- **UI Modifications**: All interface customizations work normally
+- **Message Features**: Anti-revoke, read receipts, typing indicators
+- **Media Features**: Download status, view once bypass, media quality
+- **Privacy Features**: Hide online status, freeze last seen, ghost mode
+- **Customization**: Bubble colors, custom time, hide tabs
+- **General Features**: Chat limits, pinned limits, new chat features
 
-## Troubleshooting
+### ⚠️ Limited Functionality
 
-### Common Issues
+- **Theme Customization**: Limited in manager mode, full support in embedded mode
+- **Resource Modifications**: May have reduced functionality in manager mode
+- **Custom CSS**: Limited resource hook capabilities in manager mode
 
-**Q: WaEnhancer not working after patch**
-A: Check that:
+### ❌ Not Available in LSPatch
+
+- **Bootloader Spoofer**: Requires system-level access not available in LSPatch
+- **System Server Hooks**: Deep system modifications are blocked for security
+- **Android Permissions Modification**: System permission changes not supported
+- **Anti-Detection (Advanced)**: Some deep anti-detection features unavailable
+
+## Automatic Feature Filtering
+
+WaEnhancer automatically:
+
+- **Detects LSPatch environment** and adjusts functionality accordingly
+- **Hides incompatible settings** from the UI to avoid confusion
+- **Shows clear status** indicating LSPatch mode and limitations
+- **Provides warnings** for features with limited functionality
 
 - LSPatch version is 0.6 or newer
 - WaEnhancer was properly embedded

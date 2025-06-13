@@ -437,8 +437,11 @@ public class FeatureLoader {
         // Filter classes based on LSPatch compatibility
         List<Class<?>> compatibleClasses = filterLSPatchCompatibleFeatures(classes);
         
-        XposedBridge.log("Loading " + compatibleClasses.size() + " Plugins (LSPatch compatible: " + 
-                        (classes.length - compatibleClasses.size()) + " features filtered)");
+        int filteredCount = classes.length - compatibleClasses.size();
+        XposedBridge.log("Loading " + compatibleClasses.size() + " Plugins");
+        if (filteredCount > 0) {
+            XposedBridge.log("LSPatch Compatibility: " + filteredCount + " features filtered due to incompatibility");
+        }
         
         var executorService = Executors.newWorkStealingPool(Math.min(Runtime.getRuntime().availableProcessors(), 4));
         var times = new ArrayList<String>();
@@ -537,7 +540,7 @@ public class FeatureLoader {
     /**
      * Performs LSPatch-safe hook initialization for a feature
      */
-    private static void doLSPatchSafeHook(Feature plugin) {
+    private static void doLSPatchSafeHook(Feature plugin) throws Throwable {
         try {
             // Set flag to indicate LSPatch mode for the feature
             if (plugin.prefs != null) {
@@ -558,7 +561,7 @@ public class FeatureLoader {
             // Apply hook with LSPatch optimizations
             plugin.doHook();
             
-        } catch (Exception e) {
+        } catch (Throwable e) {
             XposedBridge.log("LSPatch-safe hook failed for " + plugin.getClass().getSimpleName() + ": " + e.getMessage());
             throw e;
         }
