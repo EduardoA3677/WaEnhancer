@@ -30,9 +30,7 @@
     "ghcr.io/duduribeiro/devcontainer-features/tmux:latest": {
       "version": "3.4"
     },
-    "ghcr.io/georgofenbeck/features/lazygit-linuxbinary:latest": {},
-    "ghcr.io/social-anthrax/eza-devcontainer/eza:0": {},
-    "ghcr.io/jungaretti/features/ripgrep:1": {}
+    "ghcr.io/georgofenbeck/features/lazygit-linuxbinary:latest": {}
   },
   "customizations": {
     "vscode": {
