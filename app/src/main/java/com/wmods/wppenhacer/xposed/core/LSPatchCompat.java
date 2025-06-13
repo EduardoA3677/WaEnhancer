@@ -3,7 +3,9 @@ package com.wmods.wppenhacer.xposed.core;
 import android.content.Context;
 import android.content.pm.ApplicationInfo;
 import android.util.Log;
+import de.robv.android.xposed.XposedBridge;
 
+import java.io.File;
 import java.lang.reflect.Method;
 
 /**

@@ -1,6 +1,7 @@
 package com.wmods.wppenhacer;
 
 import android.annotation.SuppressLint;
+import android.content.Context;
 import android.content.ContextWrapper;
 import android.content.res.XModuleResources;
 import android.view.Window;
@@ -42,17 +43,25 @@ public class WppXposed implements IXposedHookLoadPackage, IXposedHookInitPackage
             if (LSPatchCompat.isLSPatchEnvironment()) {
                 // In LSPatch environment, create LSPatch-compatible preferences
                 try {
-                    Context context = Utils.getApplication();
-                    pref = new LSPatchPreferences(context);
-                    
-                    // Verify the preferences are functional
-                    if (!pref.isFunctional()) {
-                        XposedBridge.log("LSPatch preferences not functional, trying XSharedPreferences fallback");
+                    // Try to get context from LSPatchCompat helper method
+                    Context context = getCurrentApplicationContext();
+                    if (context != null) {
+                        pref = new LSPatchPreferences(context);
+                        
+                        // Verify the preferences are functional
+                        if (!pref.isFunctional()) {
+                            XposedBridge.log("LSPatch preferences not functional, trying XSharedPreferences fallback");
+                            XSharedPreferences xPrefs = new XSharedPreferences(BuildConfig.APPLICATION_ID);
+                            pref = new LSPatchPreferences(xPrefs);
+                        }
+                        
+                        XposedBridge.log("LSPatch preferences initialized successfully");
+                    } else {
+                        // Fallback to XSharedPreferences if context is not available
                         XSharedPreferences xPrefs = new XSharedPreferences(BuildConfig.APPLICATION_ID);
+                        xPrefs.makeWorldReadable();
                         pref = new LSPatchPreferences(xPrefs);
                     }
-                    
-                    XposedBridge.log("LSPatch preferences initialized successfully");
                     
                 } catch (Exception e) {
                     XposedBridge.log("Failed to initialize LSPatch preferences: " + e.getMessage());
@@ -192,6 +201,28 @@ public class WppXposed implements IXposedHookLoadPackage, IXposedHookInitPackage
                 }
             }
         });
+    }
+
+    /**
+     * Helper method to get current application context
+     * This works in both LSPatch and classic Xposed environments
+     */
+    private static Context getCurrentApplicationContext() {
+        try {
+            // Try ActivityThread method first (most reliable)
+            Class<?> activityThreadClass = Class.forName("android.app.ActivityThread");
+            Object activityThread = activityThreadClass.getMethod("currentActivityThread").invoke(null);
+            return (Context) activityThreadClass.getMethod("getApplication").invoke(activityThread);
+        } catch (Exception e) {
+            try {
+                // Fallback: try AndroidAppHelper if available (Xposed specific)
+                Class<?> appHelperClass = Class.forName("de.robv.android.xposed.AndroidAppHelper");
+                return (Context) appHelperClass.getMethod("currentApplication").invoke(null);
+            } catch (Exception e2) {
+                XposedBridge.log("Could not get application context: " + e2.getMessage());
+                return null;
+            }
+        }
     }
 
 }
