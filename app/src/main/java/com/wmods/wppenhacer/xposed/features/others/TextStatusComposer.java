@@ -24,31 +24,29 @@ public class TextStatusComposer extends Feature {
 
     public TextStatusComposer(@NonNull ClassLoader classLoader, @NonNull XSharedPreferences preferences) {
         super(classLoader, preferences);
-    }
-
-    @Override
+    }    @Override
     public void doHook() throws Throwable {
         if (!prefs.getBoolean("statuscomposer", false)) return;
 
-        var clazz = WppCore.getTextStatusComposerFragmentClass(classLoader);
-        var methodOnCreate = ReflectionUtils.findMethodUsingFilter(clazz, method -> method.getParameterCount() == 2 && method.getParameterTypes()[0] == Bundle.class && method.getParameterTypes()[1] == View.class);
+        Class<?> clazz = WppCore.getTextStatusComposerFragmentClass(classLoader);
+        java.lang.reflect.Method methodOnCreate = ReflectionUtils.findMethodUsingFilter(clazz, method -> method.getParameterCount() == 2 && method.getParameterTypes()[0] == Bundle.class && method.getParameterTypes()[1] == View.class);
         XposedBridge.hookMethod(methodOnCreate,
                 new XC_MethodHook() {
 
                     @Override
                     protected void afterHookedMethod(MethodHookParam param) throws Throwable {
                         logDebug("afterHookedMethod", "TextStatusComposer");
-                        var activity = WppCore.getCurrentActivity();
-                        var viewRoot = (View) param.args[1];
-                        var pickerColor = viewRoot.findViewById(Utils.getID("color_picker_btn", "id"));
-                        var entry = (EditText) viewRoot.findViewById(Utils.getID("entry", "id"));
+                        android.app.Activity activity = WppCore.getCurrentActivity();
+                        View viewRoot = (View) param.args[1];
+                        View pickerColor = viewRoot.findViewById(Utils.getID("color_picker_btn", "id"));
+                        EditText entry = (EditText) viewRoot.findViewById(Utils.getID("entry", "id"));
 
                         pickerColor.setOnLongClickListener(v -> {
-                            var dialog = new SimpleColorPickerDialog(activity, color -> {
+                            SimpleColorPickerDialog dialog = new SimpleColorPickerDialog(activity, color -> {
                                 try {
                                     activity.getWindow().setBackgroundDrawable(new ColorDrawable(color));
                                     viewRoot.findViewById(Utils.getID("background","id")).setBackgroundColor(color);
-                                    var controls = viewRoot.findViewById(Utils.getID("controls", "id"));
+                                    View controls = viewRoot.findViewById(Utils.getID("controls", "id"));
                                     controls.setBackgroundColor(color);
                                     colorData.backgroundColor = color;
                                 } catch (Exception e) {
@@ -60,9 +58,9 @@ public class TextStatusComposer extends Feature {
                             return true;
                         });
 
-                        var textColor = viewRoot.findViewById(Utils.getID("font_picker_btn", "id"));
+                        View textColor = viewRoot.findViewById(Utils.getID("font_picker_btn", "id"));
                         textColor.setOnLongClickListener(v -> {
-                            var dialog = new SimpleColorPickerDialog(activity, color -> {
+                            SimpleColorPickerDialog dialog = new SimpleColorPickerDialog(activity, color -> {
                                 colorData.textColor = color;
                                 entry.setTextColor(color);
                             });
@@ -74,26 +72,28 @@ public class TextStatusComposer extends Feature {
                 });
 
 
-        var methodsTextStatus = Unobfuscator.loadTextStatusData(classLoader);
-
-        for (var method : methodsTextStatus) {
-            Class<?> textDataClass = classLoader.loadClass("com.whatsapp.TextData");
-            logDebug("setColorTextComposer", Unobfuscator.getMethodDescriptor(method));
-            XposedBridge.hookMethod(method, new XC_MethodHook() {
-                @Override
-                protected void beforeHookedMethod(MethodHookParam param) throws Throwable {
-                    var textData = ReflectionUtils.getArg(param.args, textDataClass, 0);
-                    if (textData == null) return;
-                    if (colorData.textColor != -1)
-                        XposedHelpers.setObjectField(textData, "textColor", colorData.textColor);
-                    if (colorData.backgroundColor != -1)
-                        XposedHelpers.setObjectField(textData, "backgroundColor", colorData.backgroundColor);
-                    colorData.textColor = -1;
-                    colorData.backgroundColor = -1;
-                }
-            });
+        Object methodsObj = Unobfuscator.loadTextStatusData(classLoader);
+        
+        if (methodsObj instanceof java.lang.reflect.Method[]) {
+            java.lang.reflect.Method[] methodsTextStatus = (java.lang.reflect.Method[]) methodsObj;
+            for (java.lang.reflect.Method method : methodsTextStatus) {
+                Class<?> textDataClass = classLoader.loadClass("com.whatsapp.TextData");
+                logDebug("setColorTextComposer", Unobfuscator.getMethodDescriptor(method));
+                XposedBridge.hookMethod(method, new XC_MethodHook() {
+                    @Override
+                    protected void beforeHookedMethod(MethodHookParam param) throws Throwable {
+                        Object textData = ReflectionUtils.getArg(param.args, textDataClass, 0);
+                        if (textData == null) return;
+                        if (colorData.textColor != -1)
+                            XposedHelpers.setObjectField(textData, "textColor", colorData.textColor);
+                        if (colorData.backgroundColor != -1)
+                            XposedHelpers.setObjectField(textData, "backgroundColor", colorData.backgroundColor);
+                        colorData.textColor = -1;
+                        colorData.backgroundColor = -1;
+                    }
+                });
+            }
         }
-
     }
 
     @NonNull

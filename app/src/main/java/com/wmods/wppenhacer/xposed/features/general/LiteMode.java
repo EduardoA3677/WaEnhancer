@@ -6,6 +6,7 @@ import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.graphics.drawable.Drawable;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
@@ -13,6 +14,7 @@ import android.os.Environment;
 import android.provider.DocumentsContract;
 import android.provider.MediaStore;
 import android.view.Menu;
+import android.view.MenuItem;
 
 import androidx.annotation.NonNull;
 
@@ -94,15 +96,15 @@ public class LiteMode extends Feature {
     }
 
     private void InsertDownloadFolderButton(Menu menu, Activity activity) {
-        var waeMenu = prefs.getBoolean("open_wae", true);
+        boolean waeMenu = prefs.getBoolean("open_wae", true);
         if (!waeMenu) return;
-        var itemMenu = menu.add(0, 0, 9999, "Download Folder");
-        var iconDraw = activity.getDrawable(ResId.drawable.download);
+        MenuItem itemMenu = menu.add(0, 0, 9999, "Download Folder");
+        Drawable iconDraw = activity.getDrawable(ResId.drawable.download);
         iconDraw.setTint(0xff8696a0);
         itemMenu.setIcon(iconDraw);
         itemMenu.setOnMenuItemClickListener(item -> {
 
-            var folder = WppCore.getPrivString("download_folder", null);
+            String folder = WppCore.getPrivString("download_folder", null);
             if (folder != null) {
                 try {
                     folder = RealPathUtil.getRealFolderPath(activity, Uri.parse(folder));

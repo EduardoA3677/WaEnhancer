@@ -461,9 +461,9 @@ public class FeatureLoader {
         try {
             // In LSPatch, we may need different restart mechanisms
             if (LSPatchCompat.getCurrentMode() == LSPatchCompat.LSPatchMode.LSPATCH_MANAGER) {
-                // For manager mode, try to use LSPatch bridge
+                // For manager mode, log restart request and use fallback
                 if (LSPatchBridge.isInitialized()) {
-                    return LSPatchBridge.requestRestart();
+                    XposedBridge.log("[LSPatch] Restart requested, using fallback method");
                 }
             }
             

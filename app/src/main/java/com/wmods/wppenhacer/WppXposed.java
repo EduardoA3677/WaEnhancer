@@ -7,6 +7,9 @@ import android.content.res.XModuleResources;
 import android.view.Window;
 import android.view.WindowManager;
 
+import java.util.List;
+import java.util.Map;
+
 import androidx.annotation.NonNull;
 import androidx.preference.PreferenceManager;
 
@@ -16,6 +19,9 @@ import com.wmods.wppenhacer.xposed.bridge.ScopeHook;
 import com.wmods.wppenhacer.xposed.core.FeatureLoader;
 import com.wmods.wppenhacer.xposed.core.LSPatchCompat;
 import com.wmods.wppenhacer.xposed.core.LSPatchPreferences;
+import com.wmods.wppenhacer.xposed.core.LSPatchFeatureValidator;
+import com.wmods.wppenhacer.xposed.core.LSPatchTestSuite;
+import com.wmods.wppenhacer.xposed.core.LSPatchBridge;
 import com.wmods.wppenhacer.xposed.downgrade.Patch;
 import com.wmods.wppenhacer.xposed.spoofer.HookBL;
 import com.wmods.wppenhacer.xposed.utils.ResId;

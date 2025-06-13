@@ -64,8 +64,13 @@ public class ActivityController extends Feature {
                 var intent = activity.getIntent();
                 if (intent.getBooleanExtra("contact_mode", false)) {
                     var toolbar = XposedHelpers.callMethod(activity, "getSupportActionBar");
-                    var methods = ReflectionUtils.findAllMethodsUsingFilter(toolbar.getClass(), method -> method.getParameterCount() == 1 && method.getParameterTypes()[0] == CharSequence.class);
-                    ReflectionUtils.callMethod(methods[1], toolbar, activity.getString(ResId.string.select_contacts));
+                    Object methodsObj = ReflectionUtils.findAllMethodsUsingFilter(toolbar.getClass(), method -> method.getParameterCount() == 1 && method.getParameterTypes()[0] == CharSequence.class);
+                    if (methodsObj instanceof java.lang.reflect.Method[]) {
+                        java.lang.reflect.Method[] methods = (java.lang.reflect.Method[]) methodsObj;
+                        if (methods.length > 1) {
+                            ReflectionUtils.callMethod(methods[1], toolbar, activity.getString(ResId.string.select_contacts));
+                        }
+                    }
                 }
             }
         });
@@ -118,13 +123,13 @@ public class ActivityController extends Feature {
 
     private static void contactController(Intent intent, Activity activity, Class<?> statusDistribution) throws IllegalAccessException, InstantiationException, InvocationTargetException {
         Key = intent.getStringExtra("key");
-        var contacts = intent.getStringArrayListExtra("contacts");
+        ArrayList<String> contacts = intent.getStringArrayListExtra("contacts");
         var intent2 = new Intent();
         intent2.setClassName(activity.getPackageName(), "com.whatsapp.status.audienceselector.StatusTemporalRecipientsActivity");
         intent2.putExtra("contact_mode", true);
         intent2.putExtra("is_black_list", false);
         List<Object> listContacts = new ArrayList<>();
-        if (contacts != null) {
+        if (contacts != null && !contacts.isEmpty()) {
             for (String contact : contacts) {
                 try {
                     Object jid = WppCore.createUserJid(contact);

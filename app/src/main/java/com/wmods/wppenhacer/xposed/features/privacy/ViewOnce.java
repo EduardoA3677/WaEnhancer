@@ -21,20 +21,23 @@ public class ViewOnce extends Feature {
     public void doHook() throws Exception {
         if (!prefs.getBoolean("viewonce", false)) return;
 
-        var methods = Unobfuscator.loadViewOnceMethod(classLoader);
-
-        for (var method : methods) {
-            logDebug(Unobfuscator.getMethodDescriptor(method));
-            XposedBridge.hookMethod(method, new XC_MethodHook() {
-                @Override
-                protected void beforeHookedMethod(MethodHookParam param) {
-                    int returnValue = (int) param.args[0];
-                    var fMessage = new FMessageWpp(param.thisObject);
-                    if (returnValue == 1 && !fMessage.getKey().isFromMe) {
-                        param.args[0] = 0;
+        Object methodsObj = Unobfuscator.loadViewOnceMethod(classLoader);
+        
+        if (methodsObj instanceof java.lang.reflect.Method[]) {
+            java.lang.reflect.Method[] methods = (java.lang.reflect.Method[]) methodsObj;
+            for (var method : methods) {
+                logDebug(Unobfuscator.getMethodDescriptor(method));
+                XposedBridge.hookMethod(method, new XC_MethodHook() {
+                    @Override
+                    protected void beforeHookedMethod(MethodHookParam param) {
+                        int returnValue = (int) param.args[0];
+                        var fMessage = new FMessageWpp(param.thisObject);
+                        if (returnValue == 1 && !fMessage.getKey().isFromMe) {
+                            param.args[0] = 0;
+                        }
                     }
-                }
-            });
+                });
+            }
         }
     }
 

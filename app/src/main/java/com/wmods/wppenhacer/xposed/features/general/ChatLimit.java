@@ -74,9 +74,10 @@ public class ChatLimit extends Feature {
                     var listMessages = (Set) list.get(0).second;
                     var isExpired = false;
                     for (var fmessageObj : listMessages) {
-                        var timestamp = fmessageTimestampMethod.getLong(fmessageObj);
+                        Object timestampObj = fmessageTimestampMethod.get(fmessageObj);
+                        long timestamp = timestampObj instanceof Long ? (Long) timestampObj : 0L;
                         // verify message is expired (max: 3 days)
-                        if (System.currentTimeMillis() - timestamp > 3 * 24 * 60 * 60 * 1000) {
+                        if (System.currentTimeMillis() - timestamp > 3 * 24 * 60 * 60 * 1000L) {
                             isExpired = true;
                             break;
                         }
