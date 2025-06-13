@@ -51,12 +51,17 @@ public class LSPatchCompat {
         if (isLSPatchEnvironment == null) {
             isLSPatchEnvironment = detectLSPatchEnvironment();
             if (isLSPatchEnvironment) {
+                Log.i(TAG, "LSPatch environment detected - enabling compatibility mode");
                 currentMode = detectLSPatchMode();
-                Log.i(TAG, "LSPatch environment detected - Mode: " + currentMode);
+                Log.i(TAG, "LSPatch mode: " + currentMode);
             } else {
                 currentMode = LSPatchMode.CLASSIC_XPOSED;
                 Log.d(TAG, "Classic Xposed environment detected");
             }
+        }
+        return isLSPatchEnvironment;
+    }
+    
     /**
      * Checks if the current application is patched with LSPatch
      * @param context Application context

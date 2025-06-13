@@ -451,11 +451,7 @@ public class FeatureLoader {
                     
                     // Use LSPatch-aware hooking if available
                     if (LSPatchCompat.isLSPatchEnvironment()) {
-                        try {
-                            doLSPatchSafeHook(plugin);
-                        } catch (Exception e) {
-                            throw e; // Re-throw as Throwable to be caught by outer catch
-                        }
+                        doLSPatchSafeHook(plugin);
                     } else {
                         plugin.doHook();
                     }
@@ -496,25 +492,15 @@ public class FeatureLoader {
         
         // Features that are NOT compatible with LSPatch (require system server hooks)
         String[] incompatibleFeatures = {
-            "AntiWa", // Requires deep system hooks and root detector bypass
-            "CustomPrivacy", // Some functionality requires system server hooks
+            "AntiWa", // Requires system server access for deep hooks
+            "CustomPrivacy" // Some functionality requires system server hooks
         };
         
         // Features with limited functionality in LSPatch manager mode
         String[] limitedInManagerMode = {
-            "CustomThemeV2", // Limited resource hook capabilities in manager mode
-            "CustomView", // Limited resource modifications in manager mode
-            "BubbleColors", // Limited styling capabilities in manager mode
-            "IGStatus", // May have resource access limitations
-            "ShowOnline", // Limited system integration in manager mode
-        };
-        
-        // Features that work better in embedded mode
-        String[] preferEmbeddedMode = {
-            "StatusDownload", // Better file access in embedded mode
-            "MediaPreview", // Better media access in embedded mode
-            "DownloadProfile", // Better file operations in embedded mode
-            "DownloadViewOnce", // Better media handling in embedded mode
+            "CustomThemeV2", // Limited resource hook capabilities
+            "CustomView", // Limited resource modifications
+            "BubbleColors" // Limited styling capabilities
         };
         
         for (Class<?> feature : allFeatures) {
@@ -540,16 +526,6 @@ public class FeatureLoader {
                 }
             }
             
-            // Log features that work better in embedded mode
-            if (isCompatible && LSPatchCompat.getCurrentMode() == LSPatchCompat.LSPatchMode.LSPATCH_MANAGER) {
-                for (String preferred : preferEmbeddedMode) {
-                    if (featureName.equals(preferred)) {
-                        XposedBridge.log("Feature " + featureName + " works better in LSPatch embedded mode");
-                        break;
-                    }
-                }
-            }
-            
             if (isCompatible) {
                 compatibleFeatures.add(feature);
             }
@@ -561,7 +537,7 @@ public class FeatureLoader {
     /**
      * Performs LSPatch-safe hook initialization for a feature
      */
-    private static void doLSPatchSafeHook(Feature plugin) throws Exception {
+    private static void doLSPatchSafeHook(Feature plugin) {
         try {
             // Set flag to indicate LSPatch mode for the feature
             if (plugin.prefs != null) {
