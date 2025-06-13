@@ -7,6 +7,7 @@
 **Problema**: WaEnhancer reportaba estar activo en modo LSPatch aunque no detectara correctamente los hooks de com.whatsapp.
 
 **Solución**:
+
 - Implementación de `areHooksWorkingOnWhatsApp()` que verifica específicamente el acceso a clases críticas de WhatsApp
 - Validación de que los hooks funcionen realmente en el contexto de WhatsApp antes de reportar como activo
 - Verificación de que WaEnhancer core esté inicializado correctamente
@@ -16,9 +17,10 @@
 **Problema**: LSPatch no distinguía correctamente entre modo embedded y local, mostrando siempre activo.
 
 **Solución**:
+
 - Detección mejorada en `detectLSPatchMode()` que incluye:
   - Verificación de propiedades del sistema `lspatch.local` y `lspatch.remote`
-  - Análisis de metadatos de aplicación 
+  - Análisis de metadatos de aplicación
   - Verificación de clases de servicio específicas
   - Análisis de configuración LSPatch
 - Priorización de propiedades del sistema como método más confiable
@@ -28,6 +30,7 @@
 **Problema**: El sistema reportaba LSPatch como activo simplemente por detectar clases de LSPatch, sin verificar funcionalidad real.
 
 **Solución**:
+
 - Implementación de `isWaEnhancerFunctional()` que verifica:
   - Acceso real a clases de WhatsApp
   - Funcionalidad de XposedBridge
@@ -40,6 +43,7 @@
 **Problema**: No se verificaba adecuadamente que WaEnhancer estuviera ejecutándose en el contexto correcto de WhatsApp.
 
 **Solución**:
+
 - Verificación obligatoria de paquete (com.whatsapp o com.whatsapp.w4b)
 - Validación de que el ClassLoader puede acceder a clases de WhatsApp
 - Verificación de que el contexto de aplicación es válido
@@ -47,18 +51,21 @@
 ## Nuevos Métodos Agregados
 
 ### LSPatchModuleStatus.java
+
 - `areHooksWorkingOnWhatsApp()`: Verificación específica de hooks en WhatsApp
 - `verifyLSPatchMode()`: Verificación adicional del modo LSPatch detectado
 - `checkEmbeddedIndicators()`: Detección de indicadores de modo embedded/local
 - `checkManagerIndicators()`: Detección de indicadores de modo manager/remote
 
 ### LSPatchService.java
+
 - `isWaEnhancerFunctional()`: Verifica que WaEnhancer funcione realmente
 - `canHookWhatsAppClasses()`: Verifica acceso a clases de WhatsApp
 - `isWaEnhancerCoreInitialized()`: Verifica inicialización de componentes core
 - `getDetailedLSPatchStatus()`: Información detallada para debugging
 
 ### LSPatchCompat.java
+
 - Detección mejorada de modo con soporte para `lspatch.local` y `lspatch.remote`
 - Mejor manejo de propiedades del sistema
 - Verificación de configuración en assets
@@ -73,12 +80,14 @@
 ## Casos de Uso Soportados
 
 ### Modo Embedded/Local
+
 - APK parcheado directamente con LSPatch
 - Módulo embebido en la aplicación
 - Mejor rendimiento y estabilidad
 - Soporte completo de características
 
-### Modo Manager/Remote  
+### Modo Manager/Remote
+
 - Módulo cargado através de LSPatch Manager
 - Gestión más fácil de módulos
 - Algunas limitaciones en modificaciones de recursos
@@ -104,6 +113,7 @@ XposedBridge.log(status);
 ```
 
 Esto proporciona información completa sobre:
+
 - Detección de entorno LSPatch
 - Modo detectado
 - Contexto de aplicación
@@ -115,6 +125,7 @@ Esto proporciona información completa sobre:
 ## Compatibilidad
 
 Estas mejoras mantienen compatibilidad con:
+
 - LSPatch 0.6+
 - Xposed Framework tradicional
 - LSPosed
