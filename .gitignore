@@ -18,7 +18,6 @@ key.jks
 .vscode/
 
 # Dev Container
-.devcontainer/
 
 # Gradle
 .gradle/
@@ -28,4 +27,3 @@ key.jks
 .vscode/
 
 # Dev Container
-.devcontainer/
