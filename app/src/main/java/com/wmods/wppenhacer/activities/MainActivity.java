@@ -259,13 +259,17 @@ public class MainActivity extends BaseActivity {
         try {
             LSPatchModuleStatus.ModuleStatus status = LSPatchModuleStatus.getCurrentStatus();
             switch (status) {
-                case ACTIVE_LSPATCH:
-                    return "Active (LSPatch)";
+                case ACTIVE_LSPATCH_EMBEDDED:
+                    return "Active (LSPatch Embedded)";
+                case ACTIVE_LSPATCH_MANAGER:
+                    return "Active (LSPatch Manager)";
                 case ACTIVE_XPOSED:
                     return "Active (Xposed)";
-                case INACTIVE:
-                    return "Inactive";
-                case ERROR:
+                case INACTIVE_NOT_FOUND:
+                    return "Inactive - Not Found";
+                case INACTIVE_NOT_LOADED:
+                    return "Inactive - Not Loaded";
+                case INACTIVE_ERROR:
                     return "Error";
                 default:
                     return "Unknown";

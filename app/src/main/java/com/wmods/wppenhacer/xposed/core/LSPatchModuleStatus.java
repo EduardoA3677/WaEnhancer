@@ -336,4 +336,22 @@ public class LSPatchModuleStatus {
         sLastKnownStatus = ModuleStatus.UNKNOWN;
         sLastStatusCheck = 0;
     }
+    
+    /**
+     * Checks if the module is currently active
+     */
+    public static boolean isModuleActive() {
+        ModuleStatus status = getCurrentStatus();
+        return status.isActive();
+    }
+    
+    /**
+     * Checks if the module is active and working properly
+     */
+    public static boolean isModuleWorking() {
+        ModuleStatus status = getCurrentStatus();
+        return status == ModuleStatus.ACTIVE_LSPATCH_EMBEDDED || 
+               status == ModuleStatus.ACTIVE_LSPATCH_MANAGER || 
+               status == ModuleStatus.ACTIVE_XPOSED;
+    }
 }
