@@ -11,5 +11,7 @@
   "github.copilot.chat.agent.thinkingTool": true,
   "github.copilot.chat.scopeSelection": true,
   "github.copilot.nextEditSuggestions.enabled": true,
-  "github.copilot.chat.codesearch.enabled": true
+  "github.copilot.chat.codesearch.enabled": true,
+  "chat.agent.maxRequests": 40,
+  "gradle.allowParallelRun": true
 }
