@@ -23,4 +23,10 @@
     <color name="primary_background">@color/background_light</color>
     <color name="codeview_strings">#24D52B</color>
 
+    <!-- Compatibility status colors -->
+    <color name="green">#4CAF50</color>
+    <color name="blue">#2196F3</color>
+    <color name="orange">#FF9800</color>
+    <color name="red">#F44336</color>
+
 </resources>
