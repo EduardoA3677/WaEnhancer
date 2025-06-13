@@ -376,11 +376,7 @@
     
     <!-- LSPatch related strings -->
     <string name="lspatch_environment_detected">LSPatch Environment Detected</string>
-    <string name="lspatch_embedded_mode">LSPatch (Embedded Mode)</string>
-    <string name="lspatch_manager_mode">LSPatch (Manager Mode)</string>
     <string name="lspatch_full_functionality">Full functionality available</string>
-    <string name="lspatch_limited_functionality">Limited functionality - some features disabled</string>
-    <string name="lspatch_system_hooks_disabled">System server hooks disabled</string>
     <string name="classic_xposed_detected">Classic Xposed/LSPosed detected</string>
     <string name="features_hidden_lspatch">Some features have been hidden due to LSPatch limitations</string>
     <string name="enable_wa_enhancer_button">Enable Wa Enhancer Button</string>
