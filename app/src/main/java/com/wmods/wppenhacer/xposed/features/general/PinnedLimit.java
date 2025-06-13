@@ -78,7 +78,6 @@ public class PinnedLimit extends Feature {
     }
 
 
-    @Setter
     private static class PinnedLinkedHashMap<T> extends LinkedHashMap<T, T> {
 
         @Override
@@ -90,6 +89,22 @@ public class PinnedLimit extends Feature {
         }
 
         private int limit;
+
+        /**
+         * Set the limit for pinned items
+         * @param limit the maximum number of pinned items
+         */
+        public void setLimit(int limit) {
+            this.limit = limit;
+        }
+
+        /**
+         * Get the current limit
+         * @return the current limit
+         */
+        public int getLimit() {
+            return this.limit;
+        }
 
         @NonNull
         @Override

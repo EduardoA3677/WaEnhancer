@@ -161,8 +161,8 @@ public class LSPatchBridge {
                 @Override
                 protected void beforeHookedMethod(MethodHookParam param) throws Throwable {
                     try {
-                        // Directly call the callback instead of using reflection
-                        callback.beforeHookedMethod(param);
+                        // Use safe callback invocation to avoid protected access issues
+                        LSPatchHookWrapper.callSafeBefore(callback, param);
                     } catch (Exception e) {
                         Log.w(TAG, "Hook execution error in LSPatch: " + e.getMessage());
                         if (LSPatchCompat.getCurrentMode() == LSPatchCompat.LSPatchMode.LSPATCH_EMBEDDED) {
@@ -177,8 +177,8 @@ public class LSPatchBridge {
                 @Override
                 protected void afterHookedMethod(MethodHookParam param) throws Throwable {
                     try {
-                        // Directly call the callback instead of using reflection
-                        callback.afterHookedMethod(param);
+                        // Use safe callback invocation to avoid protected access issues
+                        LSPatchHookWrapper.callSafeAfter(callback, param);
                     } catch (Exception e) {
                         Log.w(TAG, "Hook execution error in LSPatch: " + e.getMessage());
                         if (LSPatchCompat.getCurrentMode() == LSPatchCompat.LSPatchMode.LSPATCH_EMBEDDED) {

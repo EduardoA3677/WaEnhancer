@@ -51,8 +51,8 @@ public class LSPatchHookWrapper {
                 @Override
                 protected void beforeHookedMethod(MethodHookParam param) throws Throwable {
                     try {
-                        // Directly call the callback instead of using reflection
-                        callback.beforeHookedMethod(param);
+                        // Use safe callback invocation
+                        LSPatchHookWrapper.callSafeBefore(callback, param);
                     } catch (Exception e) {
                         handleLSPatchHookError("beforeHookedMethod", clazz, methodName, e);
                         // Re-throw only if in manager mode or if it's a critical error
@@ -65,8 +65,8 @@ public class LSPatchHookWrapper {
                 @Override
                 protected void afterHookedMethod(MethodHookParam param) throws Throwable {
                     try {
-                        // Directly call the callback instead of using reflection
-                        callback.afterHookedMethod(param);
+                        // Use safe callback invocation
+                        LSPatchHookWrapper.callSafeAfter(callback, param);
                     } catch (Exception e) {
                         handleLSPatchHookError("afterHookedMethod", clazz, methodName, e);
                         // Re-throw only if in manager mode or if it's a critical error
@@ -118,8 +118,8 @@ public class LSPatchHookWrapper {
                 @Override
                 protected Object replaceHookedMethod(MethodHookParam param) throws Throwable {
                     try {
-                        // Directly call the replacement instead of using reflection
-                        return replacement.replaceHookedMethod(param);
+                        // Use safe replacement invocation
+                        return LSPatchHookWrapper.callSafeReplacement(replacement, param);
                     } catch (Exception e) {
                         handleLSPatchHookError("replaceHookedMethod", clazz, methodName, e);
                         
@@ -171,8 +171,8 @@ public class LSPatchHookWrapper {
             @Override
             protected void beforeHookedMethod(MethodHookParam param) throws Throwable {
                 try {
-                    // Directly call the callback instead of using reflection
-                    callback.beforeHookedMethod(param);
+                    // Use safe callback invocation
+                    LSPatchHookWrapper.callSafeBefore(callback, param);
                 } catch (Exception e) {
                     handleLSPatchHookError("beforeHookedMethod", clazz, methodName, e);
                     if (LSPatchCompat.getCurrentMode() == LSPatchCompat.LSPatchMode.LSPATCH_MANAGER) {
@@ -184,8 +184,8 @@ public class LSPatchHookWrapper {
             @Override
             protected void afterHookedMethod(MethodHookParam param) throws Throwable {
                 try {
-                    // Directly call the callback instead of using reflection
-                    callback.afterHookedMethod(param);
+                    // Use safe callback invocation
+                    LSPatchHookWrapper.callSafeAfter(callback, param);
                 } catch (Exception e) {
                     handleLSPatchHookError("afterHookedMethod", clazz, methodName, e);
                     if (LSPatchCompat.getCurrentMode() == LSPatchCompat.LSPatchMode.LSPATCH_MANAGER) {
@@ -227,8 +227,8 @@ public class LSPatchHookWrapper {
             @Override
             protected void beforeHookedMethod(MethodHookParam param) throws Throwable {
                 try {
-                    // Directly call the callback instead of using reflection
-                    callback.beforeHookedMethod(param);
+                    // Use safe callback invocation
+                    LSPatchHookWrapper.callSafeBefore(callback, param);
                 } catch (Exception e) {
                     handleLSPatchHookError("beforeHookedMethod", clazz, "<init>", e);
                     if (LSPatchCompat.getCurrentMode() == LSPatchCompat.LSPatchMode.LSPATCH_MANAGER) {
@@ -240,8 +240,8 @@ public class LSPatchHookWrapper {
             @Override
             protected void afterHookedMethod(MethodHookParam param) throws Throwable {
                 try {
-                    // Directly call the callback instead of using reflection
-                    callback.afterHookedMethod(param);
+                    // Use safe callback invocation
+                    LSPatchHookWrapper.callSafeAfter(callback, param);
                 } catch (Exception e) {
                     handleLSPatchHookError("afterHookedMethod", clazz, "<init>", e);
                     if (LSPatchCompat.getCurrentMode() == LSPatchCompat.LSPatchMode.LSPATCH_MANAGER) {
@@ -300,6 +300,60 @@ public class LSPatchHookWrapper {
     public static void clearErrorStats() {
         synchronized (sErrorCounts) {
             sErrorCounts.clear();
+        }
+    }
+    
+    /**
+     * Safely call beforeHookedMethod using reflection to avoid protected access issues
+     */
+    public static void callSafeBefore(XC_MethodHook callback, XC_MethodHook.MethodHookParam param) throws Throwable {
+        try {
+            // Use reflection to access protected method
+            java.lang.reflect.Method method = XC_MethodHook.class.getDeclaredMethod("beforeHookedMethod", XC_MethodHook.MethodHookParam.class);
+            method.setAccessible(true);
+            method.invoke(callback, param);
+        } catch (java.lang.reflect.InvocationTargetException e) {
+            // Unwrap the actual exception
+            if (e.getCause() instanceof Throwable) {
+                throw e.getCause();
+            }
+            throw e;
+        }
+    }
+    
+    /**
+     * Safely call afterHookedMethod using reflection to avoid protected access issues
+     */
+    public static void callSafeAfter(XC_MethodHook callback, XC_MethodHook.MethodHookParam param) throws Throwable {
+        try {
+            // Use reflection to access protected method
+            java.lang.reflect.Method method = XC_MethodHook.class.getDeclaredMethod("afterHookedMethod", XC_MethodHook.MethodHookParam.class);
+            method.setAccessible(true);
+            method.invoke(callback, param);
+        } catch (java.lang.reflect.InvocationTargetException e) {
+            // Unwrap the actual exception
+            if (e.getCause() instanceof Throwable) {
+                throw e.getCause();
+            }
+            throw e;
+        }
+    }
+    
+    /**
+     * Safely call replaceHookedMethod using reflection to avoid protected access issues
+     */
+    public static Object callSafeReplacement(XC_MethodReplacement replacement, XC_MethodHook.MethodHookParam param) throws Throwable {
+        try {
+            // Use reflection to access protected method
+            java.lang.reflect.Method method = XC_MethodReplacement.class.getDeclaredMethod("replaceHookedMethod", XC_MethodHook.MethodHookParam.class);
+            method.setAccessible(true);
+            return method.invoke(replacement, param);
+        } catch (java.lang.reflect.InvocationTargetException e) {
+            // Unwrap the actual exception
+            if (e.getCause() instanceof Throwable) {
+                throw e.getCause();
+            }
+            throw e;
         }
     }
 }
