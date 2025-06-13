@@ -119,6 +119,13 @@ public class WppXposed implements IXposedHookLoadPackage, IXposedHookInitPackage
                 LSPatchCompat.LSPatchMode mode = LSPatchCompat.getLSPatchMode();
                 XposedBridge.log("[LSPatch] Running in LSPatch mode: " + mode);
                 
+                // Critical: Verify we're actually in WhatsApp and hooks are working
+                if (!verifyWhatsAppLSPatchContext(packageName, classLoader)) {
+                    XposedBridge.log("[LSPatch] ERROR: WhatsApp context verification failed!");
+                    XposedBridge.log("[LSPatch] This indicates LSPatch is not properly hooked into WhatsApp");
+                    return; // Stop loading if verification fails
+                }
+                
                 // Enhanced LSPatch status logging
                 try {
                     String detailedStatus = com.wmods.wppenhacer.xposed.core.LSPatchService.getDetailedLSPatchStatus();

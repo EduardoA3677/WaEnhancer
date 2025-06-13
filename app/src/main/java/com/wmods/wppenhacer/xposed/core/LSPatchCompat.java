@@ -57,6 +57,13 @@ public class LSPatchCompat {
                 Log.i(TAG, "LSPatch environment detected - enabling compatibility mode");
                 currentMode = detectLSPatchMode();
                 Log.i(TAG, "LSPatch mode: " + currentMode);
+                
+                // Additional verification for WhatsApp context
+                if (isInWhatsAppContext()) {
+                    Log.i(TAG, "Confirmed LSPatch is running in WhatsApp context");
+                } else {
+                    Log.w(TAG, "LSPatch detected but WhatsApp context verification failed");
+                }
             } else {
                 currentMode = LSPatchMode.CLASSIC_XPOSED;
                 Log.d(TAG, "Classic Xposed environment detected");
@@ -402,6 +409,13 @@ public class LSPatchCompat {
         // Method 3: Check for application patching indicators
         Context context = getCurrentContext();
         if (context != null) {
+            // Verify this is actually WhatsApp before checking further
+            String packageName = context.getPackageName();
+            if (!"com.whatsapp".equals(packageName) && !"com.whatsapp.w4b".equals(packageName)) {
+                Log.w(TAG, "LSPatch mode detection called in non-WhatsApp context: " + packageName);
+                // Still continue but log the warning
+            }
+            
             // Check application metadata for LSPatch mode
             try {
                 android.content.pm.ApplicationInfo appInfo = context.getApplicationInfo();
@@ -609,6 +623,69 @@ public class LSPatchCompat {
             return false;
         } catch (Exception e) {
             Log.d(TAG, "Error checking class availability: " + e.getMessage());
+            return false;
+        }
+    }
+    
+    /**
+     * Verifies that we're running in WhatsApp context
+     */
+    private static boolean isInWhatsAppContext() {
+        try {
+            // Check process name
+            String processName = getCurrentProcessName();
+            if (processName != null && 
+                (processName.equals("com.whatsapp") || 
+                 processName.equals("com.whatsapp.w4b") ||
+                 processName.contains("whatsapp"))) {
+                return true;
+            }
+            
+            // Check current context
+            Context context = getCurrentContext();
+            if (context != null) {
+                String packageName = context.getPackageName();
+                if ("com.whatsapp".equals(packageName) || "com.whatsapp.w4b".equals(packageName)) {
+                    return true;
+                }
+            }
+            
+            // Check if WhatsApp classes are accessible
+            ClassLoader cl = Thread.currentThread().getContextClassLoader();
+            if (cl == null) {
+                context = getCurrentContext();
+                if (context != null) {
+                    cl = context.getClassLoader();
+                }
+            }
+            
+            if (cl != null) {
+                // Try to load key WhatsApp classes
+                String[] whatsappClasses = {
+                    "com.whatsapp.HomeActivity",
+                    "com.whatsapp.Main",
+                    "com.whatsapp.Conversation"
+                };
+                
+                for (String className : whatsappClasses) {
+                    try {
+                        cl.loadClass(className);
+                        return true; // Found at least one WhatsApp class
+                    } catch (ClassNotFoundException e) {
+                        // Try alternative naming
+                        if (className.equals("com.whatsapp.HomeActivity")) {
+                            try {
+                                cl.loadClass("com.whatsapp.home.ui.HomeActivity");
+                                return true;
+                            } catch (ClassNotFoundException ignored) {}
+                        }
+                    }
+                }
+            }
+            
+            return false;
+        } catch (Exception e) {
+            Log.w(TAG, "Error checking WhatsApp context: " + e.getMessage());
             return false;
         }
     }
