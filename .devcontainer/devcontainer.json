@@ -1,0 +1,72 @@
+{
+  "name": "codespaces",
+  "image": "mcr.microsoft.com/devcontainers/base:jammy",
+  "features": {
+    "ghcr.io/devcontainers/features/sshd:1": {
+      "version": "latest"
+    },
+    "ghcr.io/devcontainers/features/common-utils:2": {
+      "installZsh": true,
+      "configureZshAsDefaultShell": true,
+      "installOhMyZsh": true,
+      "installOhMyZshConfig": true,
+      "upgradePackages": true,
+      "username": "vscode",
+      "userUid": 1000,
+      "userGid": 1000
+    },
+    "ghcr.io/devcontainers/features/git:1": {
+      "ppa": true
+    },
+    "ghcr.io/devcontainers/features/github-cli:1": {},
+    "ghcr.io/devcontainers/features/python:1": {
+      "version": "latest",
+      "installTools": true
+    },
+    "ghcr.io/duduribeiro/devcontainer-features/neovim:1.0.1": {},
+    "ghcr.io/duduribeiro/devcontainer-features/tmux:latest": {
+      "version": "3.4"
+    },
+    "ghcr.io/georgofenbeck/features/lazygit-linuxbinary:latest": {}
+  },
+  "customizations": {
+    "vscode": {
+      "settings": {
+        "eslint.alwaysShowStatus": true,
+        "terminal.integrated.defaultProfile.linux": "zsh",
+        "workbench.iconTheme": "a-file-icon-vscode",
+        "workbench.colorTheme": "Atom Material Theme",
+        "editor.fontFamily": "Consolas, 'Courier New', monospace, 'Hack Nerd Font Mono'",
+        "terminal.integrated.fontFamily": "Consolas, 'Hack Nerd Font Mono'",
+        "terminal.integrated.fontSize": 14,
+        "github.copilot.chat.codesearch.enabled": true,
+        "github.copilot.chat.agent.thinkingTool": true,
+        "github.copilot.editor.enableCodeActions": true,
+        "github.copilot.chat.agent.runTasks": true,
+        "github.copilot.chat.search.semanticTextResults": true
+      },
+      "extensions": [
+        "tobiasalthoff.atom-material-theme",
+        "editorconfig.editorconfig",
+        "gruntfuggly.todo-tree",
+        "eamodio.gitlens",
+        "naumovs.color-highlight",
+        "ms-azuretools.vscode-docker",
+        "mhutchie.git-graph",
+        "ms-python.python",
+        "ms-python.vscode-pylance",
+        "meezilla.json",
+        "AtomMaterial.a-file-icon-vscode",
+        "yzhang.markdown-all-in-one",
+        "github.vscode-github-actions",
+        "foxundermoon.shell-format",
+        "github.vscode-pull-request-github",
+        "github.copilot",
+        "github.copilot-chat"
+      ]
+    }
+  },
+  "forwardPorts": [8888, 2222, 9090, 8080, 4433, 2121, 9000, 3333, 4444],
+  "remoteUser": "vscode",
+  "postCreateCommand": "chmod +x .devcontainer/setup.sh && .devcontainer/setup.sh"
+}
