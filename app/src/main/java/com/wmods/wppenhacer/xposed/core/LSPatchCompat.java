@@ -908,7 +908,7 @@ public class LSPatchCompat {
     /**
      * Get current package name
      */
-    private static String getCurrentPackageName() {
+    public static String getCurrentPackageName() {
         try {
             Class<?> activityThreadClass = Class.forName("android.app.ActivityThread");
             Object activityThread = activityThreadClass.getMethod("currentActivityThread").invoke(null);
