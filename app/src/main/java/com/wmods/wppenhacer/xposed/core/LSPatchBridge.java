@@ -161,6 +161,7 @@ public class LSPatchBridge {
                 @Override
                 protected void beforeHookedMethod(MethodHookParam param) throws Throwable {
                     try {
+                        // Directly call the callback instead of using reflection
                         callback.beforeHookedMethod(param);
                     } catch (Exception e) {
                         Log.w(TAG, "Hook execution error in LSPatch: " + e.getMessage());
@@ -176,6 +177,7 @@ public class LSPatchBridge {
                 @Override
                 protected void afterHookedMethod(MethodHookParam param) throws Throwable {
                     try {
+                        // Directly call the callback instead of using reflection
                         callback.afterHookedMethod(param);
                     } catch (Exception e) {
                         Log.w(TAG, "Hook execution error in LSPatch: " + e.getMessage());

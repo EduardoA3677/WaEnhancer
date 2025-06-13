@@ -28,6 +28,7 @@ import com.wmods.wppenhacer.databinding.FragmentHomeBinding;
 import com.wmods.wppenhacer.ui.fragments.base.BaseFragment;
 import com.wmods.wppenhacer.utils.FilePicker;
 import com.wmods.wppenhacer.xposed.core.FeatureLoader;
+import com.wmods.wppenhacer.xposed.core.LSPatchCompat;
 import com.wmods.wppenhacer.xposed.utils.Utils;
 
 import org.json.JSONArray;
@@ -230,9 +231,31 @@ public class HomeFragment extends BaseFragment {
 
         if (MainActivity.isXposedEnabled()) {
             binding.statusIcon.setImageResource(R.drawable.ic_round_check_circle_24);
-            binding.statusTitle.setText(R.string.module_enabled);
-            binding.statusSummary.setText(String.format(getString(R.string.version_s), BuildConfig.VERSION_NAME));
-            binding.status.setCardBackgroundColor(activity.getColor(R.color.material_state_green));
+            
+            // Check if running in LSPatch environment
+            try {
+                LSPatchCompat.init();
+                if (LSPatchCompat.isLSPatchEnvironment()) {
+                    String lspatchMode = LSPatchCompat.getCurrentMode().toString();
+                    binding.statusTitle.setText("LSPatch " + getString(R.string.module_enabled));
+                    binding.statusSummary.setText(String.format(getString(R.string.version_s) + " (LSPatch: %s)", 
+                                                 BuildConfig.VERSION_NAME, lspatchMode));
+                    
+                    // Show warning color for LSPatch to indicate limited functionality
+                    binding.status.setCardBackgroundColor(activity.getColor(R.color.material_state_yellow));
+                } else {
+                    binding.statusTitle.setText("LSPosed " + getString(R.string.module_enabled));
+                    binding.statusSummary.setText(String.format(getString(R.string.version_s) + " (Full functionality)", 
+                                                 BuildConfig.VERSION_NAME));
+                    binding.status.setCardBackgroundColor(activity.getColor(R.color.material_state_green));
+                }
+            } catch (Exception e) {
+                // Fallback for environments where LSPatch classes aren't available
+                binding.statusTitle.setText(R.string.module_enabled);
+                binding.statusSummary.setText(String.format(getString(R.string.version_s), BuildConfig.VERSION_NAME));
+                binding.status.setCardBackgroundColor(activity.getColor(R.color.material_state_green));
+            }
+            
         } else {
             binding.statusIcon.setImageResource(R.drawable.ic_round_error_outline_24);
             binding.statusTitle.setText(R.string.module_disabled);

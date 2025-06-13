@@ -51,6 +51,7 @@ public class LSPatchHookWrapper {
                 @Override
                 protected void beforeHookedMethod(MethodHookParam param) throws Throwable {
                     try {
+                        // Directly call the callback instead of using reflection
                         callback.beforeHookedMethod(param);
                     } catch (Exception e) {
                         handleLSPatchHookError("beforeHookedMethod", clazz, methodName, e);
@@ -64,6 +65,7 @@ public class LSPatchHookWrapper {
                 @Override
                 protected void afterHookedMethod(MethodHookParam param) throws Throwable {
                     try {
+                        // Directly call the callback instead of using reflection
                         callback.afterHookedMethod(param);
                     } catch (Exception e) {
                         handleLSPatchHookError("afterHookedMethod", clazz, methodName, e);
@@ -116,6 +118,7 @@ public class LSPatchHookWrapper {
                 @Override
                 protected Object replaceHookedMethod(MethodHookParam param) throws Throwable {
                     try {
+                        // Directly call the replacement instead of using reflection
                         return replacement.replaceHookedMethod(param);
                     } catch (Exception e) {
                         handleLSPatchHookError("replaceHookedMethod", clazz, methodName, e);
@@ -168,6 +171,7 @@ public class LSPatchHookWrapper {
             @Override
             protected void beforeHookedMethod(MethodHookParam param) throws Throwable {
                 try {
+                    // Directly call the callback instead of using reflection
                     callback.beforeHookedMethod(param);
                 } catch (Exception e) {
                     handleLSPatchHookError("beforeHookedMethod", clazz, methodName, e);
@@ -180,6 +184,7 @@ public class LSPatchHookWrapper {
             @Override
             protected void afterHookedMethod(MethodHookParam param) throws Throwable {
                 try {
+                    // Directly call the callback instead of using reflection
                     callback.afterHookedMethod(param);
                 } catch (Exception e) {
                     handleLSPatchHookError("afterHookedMethod", clazz, methodName, e);
@@ -222,6 +227,7 @@ public class LSPatchHookWrapper {
             @Override
             protected void beforeHookedMethod(MethodHookParam param) throws Throwable {
                 try {
+                    // Directly call the callback instead of using reflection
                     callback.beforeHookedMethod(param);
                 } catch (Exception e) {
                     handleLSPatchHookError("beforeHookedMethod", clazz, "<init>", e);
@@ -234,6 +240,7 @@ public class LSPatchHookWrapper {
             @Override
             protected void afterHookedMethod(MethodHookParam param) throws Throwable {
                 try {
+                    // Directly call the callback instead of using reflection
                     callback.afterHookedMethod(param);
                 } catch (Exception e) {
                     handleLSPatchHookError("afterHookedMethod", clazz, "<init>", e);

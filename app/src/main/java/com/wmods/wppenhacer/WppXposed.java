@@ -68,14 +68,20 @@ public class WppXposed implements IXposedHookLoadPackage, IXposedHookInitPackage
 
         Patch.handleLoadPackage(lpparam, getXPref());
 
-        ScopeHook.hook(lpparam);
+        // Initialize LSPatch compatibility first for early filtering
+        LSPatchCompat.init();
 
-        //  AndroidPermissions.hook(lpparam); in tests
+        // Only run system hooks if not in LSPatch environment
+        if (!LSPatchCompat.isLSPatchEnvironment()) {
+            ScopeHook.hook(lpparam);
+            //  AndroidPermissions.hook(lpparam); in tests
+        } else {
+            XposedBridge.log("[LSPatch] Skipping system hooks (ScopeHook, AndroidPermissions) - not compatible with LSPatch");
+        }
+
         if ((packageName.equals(FeatureLoader.PACKAGE_WPP) && App.isOriginalPackage()) || packageName.equals(FeatureLoader.PACKAGE_BUSINESS)) {
             XposedBridge.log("[•] This package: " + lpparam.packageName);
 
-            // Initialize LSPatch compatibility first
-            LSPatchCompat.init();
             if (LSPatchCompat.isLSPatchEnvironment()) {
                 XposedBridge.log("[LSPatch] Running in LSPatch mode: " + LSPatchCompat.getLSPatchMode());
                 

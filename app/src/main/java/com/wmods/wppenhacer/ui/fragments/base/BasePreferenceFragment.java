@@ -22,6 +22,7 @@ import androidx.preference.PreferenceManager;
 
 import com.wmods.wppenhacer.App;
 import com.wmods.wppenhacer.BuildConfig;
+import com.wmods.wppenhacer.xposed.core.LSPatchCompat;
 import com.wmods.wppenhacer.xposed.utils.Utils;
 
 import java.util.Objects;
@@ -104,6 +105,9 @@ public abstract class BasePreferenceFragment extends PreferenceFragmentCompat im
     @SuppressLint("ApplySharedPref")
     private void chanceStates(String key) {
 
+        // Check for LSPatch environment and disable incompatible features
+        checkLSPatchCompatibility();
+
         var lite_mode = mPrefs.getBoolean("lite_mode", false);
 
         if (lite_mode) {
@@ -164,6 +168,45 @@ public abstract class BasePreferenceFragment extends PreferenceFragmentCompat im
                     break;
             }
 
+        }
+    }
+
+    /**
+     * Disables preferences that are incompatible with LSPatch
+     */
+    private void checkLSPatchCompatibility() {
+        try {
+            LSPatchCompat.init();
+            if (LSPatchCompat.isLSPatchEnvironment()) {
+                // Disable features that require system server hooks
+                setPreferenceState("bootloader_spoofer", false);
+                setPreferenceState("bootloader_spoofer_custom", false);
+
+                // Features with limited functionality in LSPatch manager mode
+                if (LSPatchCompat.getCurrentMode() == LSPatchCompat.LSPatchMode.LSPATCH_MANAGER) {
+                    // Resource-related features may have limited functionality
+                    setPreferenceState("custom_css", false);
+                    setPreferenceState("wallpaper", false);
+                }
+
+                // Mark feature as having limitations
+                markFeatureAsLimited("custom_filters", "May have limited functionality in LSPatch");
+            }
+        } catch (Exception e) {
+            // LSPatch classes may not be available in UI context, ignore
+        }
+    }
+
+    /**
+     * Marks a preference as having limited functionality
+     */
+    private void markFeatureAsLimited(String key, String warning) {
+        var pref = findPreference(key);
+        if (pref != null) {
+            String currentSummary = pref.getSummary() != null ? pref.getSummary().toString() : "";
+            if (!currentSummary.contains("LSPatch")) {
+                pref.setSummary(currentSummary + " ⚠️ " + warning);
+            }
         }
     }
 

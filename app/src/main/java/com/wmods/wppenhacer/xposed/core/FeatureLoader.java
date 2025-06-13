@@ -108,6 +108,80 @@ public class FeatureLoader {
     private static List<String> supportedVersions;
     private static String currentVersion;
 
+    /**
+     * Initialize LSPatch compatibility layer
+     * This method sets up LSPatch specific configurations and feature filtering
+     */
+    private static void initializeLSPatchCompatibility(XSharedPreferences pref) {
+        // Initialize LSPatch compatibility
+        LSPatchCompat.init();
+        
+        if (LSPatchCompat.isLSPatchEnvironment()) {
+            XposedBridge.log("LSPatch environment detected - Mode: " + LSPatchCompat.getCurrentMode());
+            
+            // Initialize LSPatch bridge if needed
+            try {
+                // This will be called later when context is available
+                pref.edit().putBoolean("lspatch_compatibility_enabled", true).apply();
+            } catch (Exception e) {
+                XposedBridge.log("Failed to set LSPatch preference: " + e.getMessage());
+            }
+        }
+    }
+
+    /**
+     * Initialize LSPatch bridge with application context
+     */
+    private static void initializeLSPatchBridge(Application app) {
+        if (LSPatchCompat.isLSPatchEnvironment()) {
+            boolean success = LSPatchBridge.initialize(app);
+            if (success) {
+                XposedBridge.log("LSPatch bridge initialized successfully");
+            } else {
+                XposedBridge.log("LSPatch bridge initialization failed");
+            }
+        }
+    }
+
+    /**
+     * Checks if a feature is compatible with current environment
+     */
+    private static boolean isFeatureCompatible(String featureName) {
+        if (!LSPatchCompat.isLSPatchEnvironment()) {
+            return true; // All features work in classic Xposed
+        }
+        
+        // Features that require system server hooks are not compatible with LSPatch
+        String[] systemServerFeatures = {
+            "ScopeHook", // Requires system server hooks
+            "AndroidPermissions", // Requires system server hooks
+            "HookBL" // Bootloader spoofer requires system-level access
+        };
+        
+        for (String systemFeature : systemServerFeatures) {
+            if (featureName.contains(systemFeature) || featureName.equals(systemFeature)) {
+                XposedBridge.log("Feature " + featureName + " skipped - not compatible with LSPatch");
+                return false;
+            }
+        }
+        
+        // Features that have limited functionality in LSPatch
+        if (LSPatchCompat.getCurrentMode() == LSPatchCompat.LSPatchMode.LSPATCH_MANAGER) {
+            String[] limitedFeatures = {
+                "resource_hooks", // Limited in manager mode
+                "custom_themes" // Limited in manager mode
+            };
+            
+            for (String limitedFeature : limitedFeatures) {
+                if (featureName.contains(limitedFeature)) {
+                    XposedBridge.log("Feature " + featureName + " has limited functionality in LSPatch manager mode");
+                }
+            }
+        }
+        
+        return true;
+    }
+
     public static void start(@NonNull ClassLoader loader, @NonNull XSharedPreferences pref, String sourceDir) {
 
         // Initialize LSPatch compatibility layer
@@ -125,10 +199,15 @@ public class FeatureLoader {
             protected void beforeHookedMethod(MethodHookParam param) throws Throwable {
                 mApp = (Application) param.args[0];
 
-                // Inject Booloader Spoofer
-                if (pref.getBoolean("bootloader_spoofer", false)) {
+                // Initialize LSPatch bridge with application context
+                initializeLSPatchBridge(mApp);
+
+                // Inject Booloader Spoofer (only if compatible with current environment)
+                if (pref.getBoolean("bootloader_spoofer", false) && isFeatureCompatible("bootloader_spoofer")) {
                     HookBL.hook(loader, pref);
                     XposedBridge.log("Bootloader Spoofer is Injected");
+                } else if (pref.getBoolean("bootloader_spoofer", false)) {
+                    XposedBridge.log("Bootloader Spoofer skipped - not compatible with LSPatch");
                 }
 
                 PackageManager packageManager = mApp.getPackageManager();
@@ -405,16 +484,28 @@ public class FeatureLoader {
                 AudioTranscript.class,
                 GoogleTranslate.class
         };
-        XposedBridge.log("Loading Plugins");
+        
+        // Filter classes based on LSPatch compatibility
+        List<Class<?>> compatibleClasses = filterLSPatchCompatibleFeatures(classes);
+        
+        XposedBridge.log("Loading " + compatibleClasses.size() + " Plugins (LSPatch compatible: " + 
+                        (classes.length - compatibleClasses.size()) + " features filtered)");
+        
         var executorService = Executors.newWorkStealingPool(Math.min(Runtime.getRuntime().availableProcessors(), 4));
         var times = new ArrayList<String>();
-        for (var classe : classes) {
+        for (var classe : compatibleClasses) {
             CompletableFuture.runAsync(() -> {
                 var timemillis = System.currentTimeMillis();
                 try {
                     var constructor = classe.getConstructor(ClassLoader.class, XSharedPreferences.class);
                     var plugin = (Feature) constructor.newInstance(loader, pref);
-                    plugin.doHook();
+                    
+                    // Use LSPatch-aware hooking if available
+                    if (LSPatchCompat.isLSPatchEnvironment()) {
+                        doLSPatchSafeHook(plugin);
+                    } else {
+                        plugin.doHook();
+                    }
                 } catch (Throwable e) {
                     XposedBridge.log(e);
                     var error = new ErrorItem();
@@ -436,6 +527,91 @@ public class FeatureLoader {
                 if (time != null)
                     XposedBridge.log(time);
             }
+        }
+    }
+
+    /**
+     * Filters features based on LSPatch compatibility
+     */
+    private static List<Class<?>> filterLSPatchCompatibleFeatures(Class<?>[] allFeatures) {
+        List<Class<?>> compatibleFeatures = new ArrayList<>();
+        
+        if (!LSPatchCompat.isLSPatchEnvironment()) {
+            // All features are compatible with classic Xposed
+            return Arrays.asList(allFeatures);
+        }
+        
+        // Features that are NOT compatible with LSPatch (require system server hooks)
+        String[] incompatibleFeatures = {
+            "AntiWa", // Requires system server access for deep hooks
+            "CustomPrivacy" // Some functionality requires system server hooks
+        };
+        
+        // Features with limited functionality in LSPatch manager mode
+        String[] limitedInManagerMode = {
+            "CustomThemeV2", // Limited resource hook capabilities
+            "CustomView", // Limited resource modifications
+            "BubbleColors" // Limited styling capabilities
+        };
+        
+        for (Class<?> feature : allFeatures) {
+            String featureName = feature.getSimpleName();
+            boolean isCompatible = true;
+            
+            // Check if feature is completely incompatible
+            for (String incompatible : incompatibleFeatures) {
+                if (featureName.equals(incompatible)) {
+                    XposedBridge.log("Feature " + featureName + " disabled - incompatible with LSPatch");
+                    isCompatible = false;
+                    break;
+                }
+            }
+            
+            // Check if feature has limitations in manager mode
+            if (isCompatible && LSPatchCompat.getCurrentMode() == LSPatchCompat.LSPatchMode.LSPATCH_MANAGER) {
+                for (String limited : limitedInManagerMode) {
+                    if (featureName.equals(limited)) {
+                        XposedBridge.log("Feature " + featureName + " loaded with limitations in LSPatch manager mode");
+                        break;
+                    }
+                }
+            }
+            
+            if (isCompatible) {
+                compatibleFeatures.add(feature);
+            }
+        }
+        
+        return compatibleFeatures;
+    }
+    
+    /**
+     * Performs LSPatch-safe hook initialization for a feature
+     */
+    private static void doLSPatchSafeHook(Feature plugin) {
+        try {
+            // Set flag to indicate LSPatch mode for the feature
+            if (plugin.prefs != null) {
+                // Check if feature supports LSPatch mode
+                String featureName = plugin.getClass().getSimpleName();
+                boolean lspatchMode = true;
+                
+                // Use reflection to set LSPatch mode if feature supports it
+                try {
+                    java.lang.reflect.Field lspatchField = plugin.getClass().getDeclaredField("isLSPatchMode");
+                    lspatchField.setAccessible(true);
+                    lspatchField.setBoolean(plugin, lspatchMode);
+                } catch (NoSuchFieldException e) {
+                    // Feature doesn't have LSPatch mode support, that's fine
+                }
+            }
+            
+            // Apply hook with LSPatch optimizations
+            plugin.doHook();
+            
+        } catch (Exception e) {
+            XposedBridge.log("LSPatch-safe hook failed for " + plugin.getClass().getSimpleName() + ": " + e.getMessage());
+            throw e;
         }
     }
 
