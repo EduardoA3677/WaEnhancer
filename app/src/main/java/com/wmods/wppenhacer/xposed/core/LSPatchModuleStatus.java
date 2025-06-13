@@ -98,7 +98,21 @@ public class LSPatchModuleStatus {
         try {
             LSPatchCompat.LSPatchMode mode = LSPatchCompat.getCurrentMode();
             
-            // Initialize LSPatch service if needed
+            // First, verify we're actually running in WhatsApp context
+            if (!isCorrectApplicationContext()) {
+                Log.d(TAG, "Not in WhatsApp context, cannot determine LSPatch status");
+                return ModuleStatus.INACTIVE_NOT_LOADED;
+            }
+            
+            // Critical: Check if hooks are actually working on WhatsApp classes
+            boolean hooksWorking = areHooksWorkingOnWhatsApp();
+            
+            if (!hooksWorking) {
+                Log.w(TAG, "LSPatch environment detected but hooks are not working on WhatsApp");
+                return ModuleStatus.INACTIVE_NOT_LOADED;
+            }
+            
+            // Initialize LSPatch service if needed for additional verification
             if (!LSPatchService.isServiceAvailable()) {
                 Context context = getCurrentContext();
                 if (context != null) {
@@ -106,37 +120,27 @@ public class LSPatchModuleStatus {
                 }
             }
             
-            // Check if WaEnhancer is loaded in LSPatch
+            // Check if WaEnhancer is loaded in LSPatch service
             boolean moduleLoaded = LSPatchService.isWaEnhancerLoaded();
             
-            if (moduleLoaded) {
-                // Module is loaded, determine mode
-                switch (mode) {
+            // If hooks are working and we're in WhatsApp context, determine the correct mode
+            if (hooksWorking) {
+                Log.i(TAG, "Hooks are working on WhatsApp, determining LSPatch mode");
+                
+                // Verify the mode detection is accurate
+                LSPatchCompat.LSPatchMode verifiedMode = verifyLSPatchMode(mode, moduleLoaded);
+                
+                switch (verifiedMode) {
                     case LSPATCH_EMBEDDED:
                         return ModuleStatus.ACTIVE_LSPATCH_EMBEDDED;
                     case LSPATCH_MANAGER:
                         return ModuleStatus.ACTIVE_LSPATCH_MANAGER;
                     default:
-                        return ModuleStatus.ACTIVE_LSPATCH_EMBEDDED; // Default assumption
+                        // If mode is unclear but hooks work, default to embedded
+                        return ModuleStatus.ACTIVE_LSPATCH_EMBEDDED;
                 }
             } else {
-                // Module not found in LSPatch service, but we're still in LSPatch
-                // This could mean the module is embedded but not listed in services
-                
-                // Check if hooks are actually working
-                if (areHooksWorking()) {
-                    Log.i(TAG, "Hooks are working despite module not being in service list");
-                    switch (mode) {
-                        case LSPATCH_EMBEDDED:
-                            return ModuleStatus.ACTIVE_LSPATCH_EMBEDDED;
-                        case LSPATCH_MANAGER:
-                            return ModuleStatus.ACTIVE_LSPATCH_MANAGER;
-                        default:
-                            return ModuleStatus.ACTIVE_LSPATCH_EMBEDDED;
-                    }
-                } else {
-                    return ModuleStatus.INACTIVE_NOT_LOADED;
-                }
+                return ModuleStatus.INACTIVE_NOT_LOADED;
             }
             
         } catch (Exception e) {
@@ -201,13 +205,125 @@ public class LSPatchModuleStatus {
     }
     
     /**
-     * Check if hooks are actually working
+     * Verify LSPatch mode detection with additional checks
      */
-    private static boolean areHooksWorking() {
+    private static LSPatchCompat.LSPatchMode verifyLSPatchMode(LSPatchCompat.LSPatchMode detectedMode, boolean moduleInService) {
         try {
-            // First, verify we're in the correct app context
+            // Check for embedded indicators
+            boolean hasEmbeddedIndicators = checkEmbeddedIndicators();
+            
+            // Check for manager indicators  
+            boolean hasManagerIndicators = checkManagerIndicators();
+            
+            Log.d(TAG, "Mode verification - Detected: " + detectedMode + 
+                      ", Embedded indicators: " + hasEmbeddedIndicators + 
+                      ", Manager indicators: " + hasManagerIndicators +
+                      ", In service: " + moduleInService);
+            
+            // If we have clear embedded indicators and no manager indicators
+            if (hasEmbeddedIndicators && !hasManagerIndicators) {
+                return LSPatchCompat.LSPatchMode.LSPATCH_EMBEDDED;
+            }
+            
+            // If we have manager indicators or module is found in service
+            if (hasManagerIndicators || moduleInService) {
+                return LSPatchCompat.LSPatchMode.LSPATCH_MANAGER;
+            }
+            
+            // Fallback to detected mode
+            return detectedMode;
+            
+        } catch (Exception e) {
+            Log.w(TAG, "Error verifying LSPatch mode: " + e.getMessage());
+            return detectedMode;
+        }
+    }
+    
+    /**
+     * Check for embedded mode indicators
+     */
+    private static boolean checkEmbeddedIndicators() {
+        try {
+            // Check for embedded-specific classes
+            if (isClassAvailable("org.lsposed.lspatch.service.LocalApplicationService")) {
+                return true;
+            }
+            
+            // Check for embedded metadata
+            Context context = getCurrentContext();
+            if (context != null) {
+                try {
+                    context.getAssets().open("lspatch/embedded.flag");
+                    return true;
+                } catch (Exception e) {
+                    // File doesn't exist
+                }
+                
+                // Check for embedded system properties
+                if ("true".equals(System.getProperty("lspatch.embedded"))) {
+                    return true;
+                }
+                
+                if ("embedded".equals(System.getProperty("lspatch.mode"))) {
+                    return true;
+                }
+            }
+            
+            return false;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+    
+    /**
+     * Check for manager mode indicators
+     */
+    private static boolean checkManagerIndicators() {
+        try {
+            // Check for manager-specific classes
+            if (isClassAvailable("org.lsposed.lspatch.service.RemoteApplicationService")) {
+                return true;
+            }
+            
+            // Check for manager system properties
+            if ("true".equals(System.getProperty("lspatch.manager"))) {
+                return true;
+            }
+            
+            if ("manager".equals(System.getProperty("lspatch.mode"))) {
+                return true;
+            }
+            
+            // Check for manager package
+            if ("org.lsposed.lspatch".equals(System.getProperty("lspatch.manager.package"))) {
+                return true;
+            }
+            
+            return false;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+    
+    /**
+     * Check if a class is available
+     */
+    private static boolean isClassAvailable(String className) {
+        try {
+            Class.forName(className);
+            return true;
+        } catch (ClassNotFoundException e) {
+            return false;
+        }
+    }
+    
+    /**
+     * Enhanced hook verification specifically for WhatsApp
+     */
+    private static boolean areHooksWorkingOnWhatsApp() {
+        try {
+            // First verify we're in WhatsApp context
             if (!isCorrectApplicationContext()) {
-                Log.d(TAG, "Not in WhatsApp context");
                 return false;
             }
             
@@ -217,36 +333,86 @@ public class LSPatchModuleStatus {
                 return false;
             }
             
-            // Check if our core classes are initialized
+            // Try to access core WhatsApp classes that WaEnhancer hooks
+            ClassLoader cl = Thread.currentThread().getContextClassLoader();
+            if (cl == null) {
+                Context context = getCurrentContext();
+                if (context != null) {
+                    cl = context.getClassLoader();
+                }
+            }
+            
+            if (cl == null) {
+                Log.w(TAG, "Could not get ClassLoader");
+                return false;
+            }
+            
+            // Test access to key WhatsApp classes that WaEnhancer needs to hook
+            String[] criticalWhatsAppClasses = {
+                "com.whatsapp.HomeActivity",
+                "com.whatsapp.Main", 
+                "com.whatsapp.Conversation",
+                "com.whatsapp.jobqueue.job.SendReadReceiptJob"
+            };
+            
+            int accessibleClasses = 0;
+            for (String className : criticalWhatsAppClasses) {
+                try {
+                    Class<?> clazz = cl.loadClass(className);
+                    if (clazz != null) {
+                        accessibleClasses++;
+                        Log.d(TAG, "Successfully accessed WhatsApp class: " + className);
+                    }
+                } catch (ClassNotFoundException e) {
+                    // Try alternative class names for newer WhatsApp versions
+                    if (className.equals("com.whatsapp.HomeActivity")) {
+                        try {
+                            cl.loadClass("com.whatsapp.home.ui.HomeActivity");
+                            accessibleClasses++;
+                        } catch (ClassNotFoundException e2) {
+                            // Neither version available
+                        }
+                    }
+                }
+            }
+            
+            // We need at least 2 critical classes to be accessible
+            if (accessibleClasses < 2) {
+                Log.w(TAG, "Cannot access enough WhatsApp classes (" + accessibleClasses + "/" + criticalWhatsAppClasses.length + ")");
+                return false;
+            }
+            
+            // Check if WaEnhancer core components are initialized
             if (isWppCoreInitialized()) {
-                Log.d(TAG, "WppCore is initialized - hooks are working");
+                Log.d(TAG, "WppCore is initialized - hooks are working on WhatsApp");
                 return true;
             }
             
-            // Check if FeatureLoader has been initialized
             if (isFeatureLoaderInitialized()) {
-                Log.d(TAG, "FeatureLoader is initialized - hooks are working");
+                Log.d(TAG, "FeatureLoader is initialized - hooks are working on WhatsApp");
                 return true;
             }
             
-            // Check if any of our features are working
-            if (areFeaturesWorking()) {
-                Log.d(TAG, "Features are working - hooks are working");
-                return true;
-            }
-            
-            // Check if WaEnhancer classes are loaded in classloader
+            // Final verification: check if WaEnhancer classes are properly loaded
             if (areWaEnhancerClassesLoaded()) {
-                Log.d(TAG, "WaEnhancer classes are loaded - hooks are working");
+                Log.d(TAG, "WaEnhancer classes are loaded in WhatsApp context");
                 return true;
             }
             
+            Log.w(TAG, "WhatsApp classes accessible but WaEnhancer components not initialized");
             return false;
             
         } catch (Exception e) {
-            Log.d(TAG, "Error checking if hooks are working: " + e.getMessage());
+            Log.e(TAG, "Error checking if hooks are working on WhatsApp: " + e.getMessage());
             return false;
         }
+    }
+    
+    /**
+     * Check if hooks are actually working (legacy method for compatibility)
+     */
+    private static boolean areHooksWorking() {
+        return areHooksWorkingOnWhatsApp();
     }
     
     /**

@@ -347,112 +347,135 @@ public class LSPatchCompat {
     }
     
     private static LSPatchMode detectLSPatchMode() {
-        // Enhanced mode detection with multiple methods
+        // Enhanced mode detection with more precise checks
         
-        // Method 1: Check for manager mode first (RemoteApplicationService)
-        if (isClassAvailable("org.lsposed.lspatch.service.RemoteApplicationService")) {
-            Log.d(TAG, "RemoteApplicationService detected - Manager Mode");
-            return LSPatchMode.LSPATCH_MANAGER;
-        }
+        Log.d(TAG, "Starting enhanced LSPatch mode detection");
         
-        // Method 2: Check for embedded mode (LocalApplicationService) 
-        if (isClassAvailable("org.lsposed.lspatch.service.LocalApplicationService")) {
-            Log.d(TAG, "LocalApplicationService detected - Embedded Mode");
-            return LSPatchMode.LSPATCH_EMBEDDED;
-        }
-        
-        // Method 3: Check for LSPatch meta loader (indicates patched APK - embedded mode)
-        if (isClassAvailable(LSPATCH_METALOADER_CLASS)) {
-            Log.d(TAG, "LSPatch MetaLoader detected - Embedded Mode");
-            return LSPatchMode.LSPATCH_EMBEDDED;
-        }
-        
-        // Method 4: Check for LSPatch loader (embedded mode)
-        if (isClassAvailable(LSPATCH_LOADER_CLASS)) {
-            Log.d(TAG, "LSPatch Loader detected - Embedded Mode");
-            return LSPatchMode.LSPATCH_EMBEDDED;
-        }
-        
-        // Method 5: Check system properties for mode detection
+        // Method 1: Check system properties first (most reliable)
         try {
-            String managerPackage = System.getProperty("lspatch.manager.package");
-            if ("org.lsposed.lspatch".equals(managerPackage)) {
-                Log.d(TAG, "Manager package property detected - Manager Mode");
+            String lspatchMode = System.getProperty("lspatch.mode");
+            if ("embedded".equals(lspatchMode) || "local".equals(lspatchMode)) {
+                Log.d(TAG, "System property indicates embedded/local mode: " + lspatchMode);
+                return LSPatchMode.LSPATCH_EMBEDDED;
+            } else if ("manager".equals(lspatchMode) || "remote".equals(lspatchMode)) {
+                Log.d(TAG, "System property indicates manager/remote mode: " + lspatchMode);
                 return LSPatchMode.LSPATCH_MANAGER;
             }
             
+            // Check specific mode properties
             String embeddedMode = System.getProperty("lspatch.embedded");
-            if ("true".equals(embeddedMode)) {
-                Log.d(TAG, "Embedded property detected - Embedded Mode");
+            String localMode = System.getProperty("lspatch.local");
+            if ("true".equals(embeddedMode) || "true".equals(localMode)) {
+                Log.d(TAG, "Embedded/local property detected - Embedded Mode");
                 return LSPatchMode.LSPATCH_EMBEDDED;
             }
             
             String managerMode = System.getProperty("lspatch.manager");
-            if ("true".equals(managerMode)) {
-                Log.d(TAG, "Manager property detected - Manager Mode");
+            String remoteMode = System.getProperty("lspatch.remote");
+            if ("true".equals(managerMode) || "true".equals(remoteMode)) {
+                Log.d(TAG, "Manager/remote property detected - Manager Mode");
                 return LSPatchMode.LSPATCH_MANAGER;
             }
             
-            String lspatchMode = System.getProperty("lspatch.mode");
-            if ("embedded".equals(lspatchMode)) {
-                Log.d(TAG, "Mode property embedded detected - Embedded Mode");
-                return LSPatchMode.LSPATCH_EMBEDDED;
-            } else if ("manager".equals(lspatchMode)) {
-                Log.d(TAG, "Mode property manager detected - Manager Mode");
+            String managerPackage = System.getProperty("lspatch.manager.package");
+            if ("org.lsposed.lspatch".equals(managerPackage)) {
+                Log.d(TAG, "Manager package property detected - Manager Mode");
                 return LSPatchMode.LSPATCH_MANAGER;
             }
         } catch (Exception e) {
             Log.d(TAG, "Property access error: " + e.getMessage());
         }
         
-        // Method 6: Check for embedded modules in assets (indicates embedded mode)
-        try {
-            Context context = getCurrentContext();
-            if (context != null) {
-                // Check for LSPatch embedded modules
-                try {
-                    String[] modules = context.getAssets().list("lspatch/modules");
-                    if (modules != null && modules.length > 0) {
-                        Log.d(TAG, "Embedded modules detected - Embedded Mode");
-                        return LSPatchMode.LSPATCH_EMBEDDED;
-                    }
-                } catch (Exception e) {
-                    // Assets might not exist
-                }
-                
-                // Check for LSPatch configuration that indicates mode
-                try {
-                    java.io.InputStream configStream = context.getAssets().open("lspatch/config.json");
-                    java.util.Scanner scanner = new java.util.Scanner(configStream).useDelimiter("\\A");
-                    String config = scanner.hasNext() ? scanner.next() : "";
-                    configStream.close();
-                    
-                    if (config.contains("\"embedded\":true") || config.contains("\"mode\":\"embedded\"")) {
-                        Log.d(TAG, "Config indicates embedded mode - Embedded Mode");
-                        return LSPatchMode.LSPATCH_EMBEDDED;
-                    } else if (config.contains("\"manager\":true") || config.contains("\"mode\":\"manager\"")) {
-                        Log.d(TAG, "Config indicates manager mode - Manager Mode");
-                        return LSPatchMode.LSPATCH_MANAGER;
-                    }
-                } catch (Exception e) {
-                    // Config file might not exist or be readable
-                }
-            }
-        } catch (Exception e) {
-            Log.d(TAG, "Context access error: " + e.getMessage());
+        // Method 2: Check service classes availability (order matters)
+        // Manager mode typically has RemoteApplicationService
+        if (isClassAvailable("org.lsposed.lspatch.service.RemoteApplicationService")) {
+            Log.d(TAG, "RemoteApplicationService detected - Manager Mode");
+            return LSPatchMode.LSPATCH_MANAGER;
         }
         
-        // Method 7: Check classloader hierarchy for LSPatch indicators
+        // Embedded/local mode typically has LocalApplicationService
+        if (isClassAvailable("org.lsposed.lspatch.service.LocalApplicationService")) {
+            Log.d(TAG, "LocalApplicationService detected - Embedded Mode");
+            return LSPatchMode.LSPATCH_EMBEDDED;
+        }
+        
+        // Method 3: Check for application patching indicators
+        Context context = getCurrentContext();
+        if (context != null) {
+            // Check application metadata for LSPatch mode
+            try {
+                android.content.pm.ApplicationInfo appInfo = context.getApplicationInfo();
+                if (appInfo.metaData != null) {
+                    // Check for embedded indicators
+                    if (appInfo.metaData.containsKey("lspatch.embedded") || 
+                        appInfo.metaData.containsKey("lspatch.local")) {
+                        Log.d(TAG, "Application metadata indicates embedded/local mode");
+                        return LSPatchMode.LSPATCH_EMBEDDED;
+                    }
+                    
+                    // Check for manager indicators
+                    if (appInfo.metaData.containsKey("lspatch.manager") ||
+                        appInfo.metaData.containsKey("lspatch.remote")) {
+                        Log.d(TAG, "Application metadata indicates manager/remote mode");
+                        return LSPatchMode.LSPATCH_MANAGER;
+                    }
+                }
+                
+                // Check for LSPatch component factory (typically embedded)
+                if ("org.lsposed.lspatch.metaloader.LSPAppComponentFactoryStub".equals(appInfo.appComponentFactory)) {
+                    Log.d(TAG, "LSPatch component factory detected - Embedded Mode");
+                    return LSPatchMode.LSPATCH_EMBEDDED;
+                }
+            } catch (Exception e) {
+                Log.d(TAG, "Error checking application info: " + e.getMessage());
+            }
+            
+            // Check LSPatch configuration files
+            try {
+                // Check for embedded configuration
+                java.io.InputStream configStream = context.getAssets().open("lspatch/config.json");
+                java.util.Scanner scanner = new java.util.Scanner(configStream).useDelimiter("\\A");
+                String config = scanner.hasNext() ? scanner.next() : "";
+                configStream.close();
+                
+                if (config.contains("\"embedded\":true") || 
+                    config.contains("\"mode\":\"embedded\"") ||
+                    config.contains("\"mode\":\"local\"")) {
+                    Log.d(TAG, "Config indicates embedded/local mode");
+                    return LSPatchMode.LSPATCH_EMBEDDED;
+                } else if (config.contains("\"manager\":true") || 
+                           config.contains("\"mode\":\"manager\"") ||
+                           config.contains("\"mode\":\"remote\"")) {
+                    Log.d(TAG, "Config indicates manager/remote mode");
+                    return LSPatchMode.LSPATCH_MANAGER;
+                }
+            } catch (Exception e) {
+                // Config file might not exist
+            }
+        }
+        
+        // Method 4: Check for LSPatch meta loader and loader classes
+        if (isClassAvailable(LSPATCH_METALOADER_CLASS)) {
+            Log.d(TAG, "LSPatch MetaLoader detected - Embedded Mode");
+            return LSPatchMode.LSPATCH_EMBEDDED;
+        }
+        
+        if (isClassAvailable(LSPATCH_LOADER_CLASS)) {
+            Log.d(TAG, "LSPatch Loader detected - Embedded Mode");
+            return LSPatchMode.LSPATCH_EMBEDDED;
+        }
+        
+        // Method 5: Check classloader hierarchy for LSPatch indicators
         try {
             ClassLoader cl = Thread.currentThread().getContextClassLoader();
             String clString = cl.toString();
             
             if (clString.contains("lspatch") || clString.contains("LSPatch")) {
                 if (clString.contains("embedded") || clString.contains("local")) {
-                    Log.d(TAG, "ClassLoader indicates embedded mode - Embedded Mode");
+                    Log.d(TAG, "ClassLoader indicates embedded/local mode");
                     return LSPatchMode.LSPATCH_EMBEDDED;
                 } else if (clString.contains("manager") || clString.contains("remote")) {
-                    Log.d(TAG, "ClassLoader indicates manager mode - Manager Mode");
+                    Log.d(TAG, "ClassLoader indicates manager/remote mode");
                     return LSPatchMode.LSPATCH_MANAGER;
                 }
             }
@@ -460,15 +483,17 @@ public class LSPatchCompat {
             Log.d(TAG, "ClassLoader check error: " + e.getMessage());
         }
         
-        // Method 8: Check for LSPatch process name patterns
+        // Method 6: Check process name patterns
         try {
             String processName = getCurrentProcessName();
             if (processName != null) {
-                if (processName.contains("lspatch") && processName.contains("embedded")) {
-                    Log.d(TAG, "Process name indicates embedded mode - Embedded Mode");
+                if ((processName.contains("lspatch") && processName.contains("embedded")) ||
+                    (processName.contains("lspatch") && processName.contains("local"))) {
+                    Log.d(TAG, "Process name indicates embedded/local mode");
                     return LSPatchMode.LSPATCH_EMBEDDED;
-                } else if (processName.contains("lspatch") && processName.contains("manager")) {
-                    Log.d(TAG, "Process name indicates manager mode - Manager Mode");
+                } else if ((processName.contains("lspatch") && processName.contains("manager")) ||
+                          (processName.contains("lspatch") && processName.contains("remote"))) {
+                    Log.d(TAG, "Process name indicates manager/remote mode");
                     return LSPatchMode.LSPATCH_MANAGER;
                 }
             }
@@ -477,8 +502,8 @@ public class LSPatchCompat {
         }
         
         // Default to embedded mode if LSPatch is detected but mode is unclear
-        // This is the most common scenario
-        Log.d(TAG, "Mode unclear, defaulting to Embedded Mode");
+        // This is safer since embedded mode has fewer restrictions
+        Log.d(TAG, "Mode unclear, defaulting to Embedded Mode (safer choice)");
         return LSPatchMode.LSPATCH_EMBEDDED;
     }
     

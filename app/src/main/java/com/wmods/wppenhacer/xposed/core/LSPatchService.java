@@ -159,31 +159,57 @@ public class LSPatchService {
      */
     public static boolean isWaEnhancerLoaded() {
         try {
-            // Method 1: Check in LSPatch module list
+            Log.d(TAG, "Checking if WaEnhancer is loaded in LSPatch");
+            
+            // Critical: First verify we're in WhatsApp context
+            Context context = getCurrentContext();
+            if (context == null) {
+                Log.w(TAG, "Cannot get current context");
+                return false;
+            }
+            
+            String packageName = context.getPackageName();
+            if (!"com.whatsapp".equals(packageName) && !"com.whatsapp.w4b".equals(packageName)) {
+                Log.w(TAG, "Not in WhatsApp context: " + packageName);
+                return false;
+            }
+            
+            // Method 1: Check in LSPatch module list (most reliable if available)
             Object modulesList = getModulesList();
             if (modulesList != null && isWaEnhancerInModulesList(modulesList)) {
                 Log.d(TAG, "WaEnhancer found in LSPatch modules list");
+                
+                // Double-check: verify hooks are actually working
+                if (areWaEnhancerClassesLoaded() && isWaEnhancerFunctional()) {
+                    Log.d(TAG, "WaEnhancer confirmed functional in modules list");
+                    return true;
+                } else {
+                    Log.w(TAG, "WaEnhancer in modules list but not functional");
+                    return false;
+                }
+            }
+            
+            // Method 2: Check if WaEnhancer is actually functional (most important)
+            if (isWaEnhancerFunctional()) {
+                Log.d(TAG, "WaEnhancer is functional even if not in service list");
                 return true;
             }
             
-            // Method 2: Check if WaEnhancer classes are loaded in current classloader
+            // Method 3: Check if WaEnhancer classes are loaded in current classloader
             if (areWaEnhancerClassesLoaded()) {
-                Log.d(TAG, "WaEnhancer classes found in classloader");
-                return true;
+                Log.d(TAG, "WaEnhancer classes found in classloader, verifying functionality");
+                
+                // Additional verification: check if we can actually hook WhatsApp
+                if (canHookWhatsAppClasses()) {
+                    Log.d(TAG, "Can hook WhatsApp classes - WaEnhancer is loaded");
+                    return true;
+                } else {
+                    Log.w(TAG, "WaEnhancer classes loaded but cannot hook WhatsApp classes");
+                    return false;
+                }
             }
             
-            // Method 3: Check if we're running in correct WhatsApp context with WaEnhancer
-            if (isInWhatsAppWithWaEnhancer()) {
-                Log.d(TAG, "Running in WhatsApp context with WaEnhancer");
-                return true;
-            }
-            
-            // Method 4: Check LSPatch service health and WaEnhancer indicators
-            if (isServiceHealthyWithWaEnhancer()) {
-                Log.d(TAG, "LSPatch service is healthy and WaEnhancer indicators found");
-                return true;
-            }
-            
+            Log.w(TAG, "WaEnhancer not found or not functional");
             return false;
             
         } catch (Exception e) {
@@ -472,5 +498,241 @@ public class LSPatchService {
         sRemoteService = null;
         sInitialized = false;
         Log.d(TAG, "LSPatch services cleaned up");
+    }
+    
+    /**
+     * Check if WaEnhancer is actually functional (can hook and modify WhatsApp)
+     */
+    private static boolean isWaEnhancerFunctional() {
+        try {
+            // Test 1: Check if XposedBridge is working
+            try {
+                de.robv.android.xposed.XposedBridge.log("WaEnhancer functionality test");
+            } catch (Exception e) {
+                Log.w(TAG, "XposedBridge not functional: " + e.getMessage());
+                return false;
+            }
+            
+            // Test 2: Check if we can access WhatsApp core classes
+            if (!canHookWhatsAppClasses()) {
+                Log.w(TAG, "Cannot access WhatsApp classes for hooking");
+                return false;
+            }
+            
+            // Test 3: Check if WaEnhancer core is initialized
+            if (isWaEnhancerCoreInitialized()) {
+                Log.d(TAG, "WaEnhancer core is initialized");
+                return true;
+            }
+            
+            // Test 4: Check if WaEnhancer preferences are accessible
+            if (isWaEnhancerPreferencesAccessible()) {
+                Log.d(TAG, "WaEnhancer preferences are accessible");
+                return true;
+            }
+            
+            return false;
+            
+        } catch (Exception e) {
+            Log.w(TAG, "Error checking WaEnhancer functionality: " + e.getMessage());
+            return false;
+        }
+    }
+    
+    /**
+     * Check if we can hook WhatsApp classes
+     */
+    private static boolean canHookWhatsAppClasses() {
+        try {
+            ClassLoader cl = Thread.currentThread().getContextClassLoader();
+            if (cl == null) {
+                Context context = getCurrentContext();
+                if (context != null) {
+                    cl = context.getClassLoader();
+                }
+            }
+            
+            if (cl == null) {
+                return false;
+            }
+            
+            // Try to access critical WhatsApp classes
+            String[] testClasses = {
+                "com.whatsapp.HomeActivity",
+                "com.whatsapp.Main",
+                "com.whatsapp.Conversation"
+            };
+            
+            for (String className : testClasses) {
+                try {
+                    Class<?> clazz = cl.loadClass(className);
+                    if (clazz != null) {
+                        Log.d(TAG, "Successfully accessed WhatsApp class: " + className);
+                        return true;
+                    }
+                } catch (ClassNotFoundException e) {
+                    // Try alternative class names for newer versions
+                    if (className.equals("com.whatsapp.HomeActivity")) {
+                        try {
+                            cl.loadClass("com.whatsapp.home.ui.HomeActivity");
+                            Log.d(TAG, "Successfully accessed alternative WhatsApp class");
+                            return true;
+                        } catch (ClassNotFoundException e2) {
+                            // Continue
+                        }
+                    }
+                }
+            }
+            
+            return false;
+            
+        } catch (Exception e) {
+            Log.w(TAG, "Error testing WhatsApp class access: " + e.getMessage());
+            return false;
+        }
+    }
+    
+    /**
+     * Check if WaEnhancer core components are initialized
+     */
+    private static boolean isWaEnhancerCoreInitialized() {
+        try {
+            // Check for WppCore initialization
+            Class<?> wppCoreClass = Class.forName("com.wmods.wppenhacer.xposed.core.WppCore");
+            
+            // Try to access static fields that indicate initialization
+            try {
+                java.lang.reflect.Field field = wppCoreClass.getDeclaredField("mApp");
+                field.setAccessible(true);
+                Object mApp = field.get(null);
+                if (mApp != null) {
+                    Log.d(TAG, "WppCore mApp is initialized");
+                    return true;
+                }
+            } catch (Exception e) {
+                // Field might not exist or not be accessible
+            }
+            
+            // Check for FeatureLoader initialization
+            try {
+                Class<?> featureLoaderClass = Class.forName("com.wmods.wppenhacer.xposed.core.FeatureLoader");
+                java.lang.reflect.Field mAppField = featureLoaderClass.getDeclaredField("mApp");
+                mAppField.setAccessible(true);
+                Object mApp = mAppField.get(null);
+                if (mApp != null) {
+                    Log.d(TAG, "FeatureLoader mApp is initialized");
+                    return true;
+                }
+            } catch (Exception e) {
+                // Field might not exist
+            }
+            
+            return false;
+            
+        } catch (ClassNotFoundException e) {
+            Log.d(TAG, "WaEnhancer core classes not found");
+            return false;
+        } catch (Exception e) {
+            Log.w(TAG, "Error checking WaEnhancer core initialization: " + e.getMessage());
+            return false;
+        }
+    }
+    
+    /**
+     * Check if WaEnhancer preferences are accessible
+     */
+    private static boolean isWaEnhancerPreferencesAccessible() {
+        try {
+            Context context = getCurrentContext();
+            if (context == null) {
+                return false;
+            }
+            
+            // Try to access WaEnhancer preferences
+            android.content.SharedPreferences prefs = context.getSharedPreferences("WaGlobal", Context.MODE_PRIVATE);
+            if (prefs != null) {
+                // Check if any WaEnhancer preferences exist
+                java.util.Map<String, ?> allPrefs = prefs.getAll();
+                if (!allPrefs.isEmpty()) {
+                    Log.d(TAG, "WaEnhancer preferences are accessible and contain data");
+                    return true;
+                }
+                
+                // Even empty preferences indicate WaEnhancer is set up
+                Log.d(TAG, "WaEnhancer preferences are accessible");
+                return true;
+            }
+            
+            return false;
+            
+        } catch (Exception e) {
+            Log.w(TAG, "Error checking WaEnhancer preferences: " + e.getMessage());
+            return false;
+        }
+    }
+    
+    /**
+     * Enhanced debug information for LSPatch troubleshooting
+     */
+    public static String getDetailedLSPatchStatus() {
+        StringBuilder status = new StringBuilder();
+        status.append("=== WaEnhancer LSPatch Status ===\n");
+        
+        try {
+            // Environment detection
+            boolean isLSPatch = LSPatchCompat.isLSPatchEnvironment();
+            status.append("LSPatch Environment: ").append(isLSPatch).append("\n");
+            
+            if (isLSPatch) {
+                LSPatchCompat.LSPatchMode mode = LSPatchCompat.getCurrentMode();
+                status.append("LSPatch Mode: ").append(mode).append("\n");
+                
+                // Context verification
+                Context context = getCurrentContext();
+                if (context != null) {
+                    String packageName = context.getPackageName();
+                    status.append("Package Name: ").append(packageName).append("\n");
+                    status.append("Is WhatsApp: ").append(
+                        "com.whatsapp".equals(packageName) || "com.whatsapp.w4b".equals(packageName)
+                    ).append("\n");
+                } else {
+                    status.append("Context: null\n");
+                }
+                
+                // Service availability
+                status.append("LSPatch Service Available: ").append(isServiceAvailable()).append("\n");
+                status.append("Local Service: ").append(sLocalService != null).append("\n");
+                status.append("Remote Service: ").append(sRemoteService != null).append("\n");
+                
+                // Module detection
+                status.append("WaEnhancer in Service List: ").append(
+                    isWaEnhancerInModulesList(getModulesList())
+                ).append("\n");
+                
+                // Functionality checks
+                status.append("WaEnhancer Classes Loaded: ").append(areWaEnhancerClassesLoaded()).append("\n");
+                status.append("Can Hook WhatsApp: ").append(canHookWhatsAppClasses()).append("\n");
+                status.append("WaEnhancer Functional: ").append(isWaEnhancerFunctional()).append("\n");
+                status.append("WaEnhancer Loaded: ").append(isWaEnhancerLoaded()).append("\n");
+                
+                // System properties
+                status.append("\nSystem Properties:\n");
+                String[] props = {
+                    "lspatch.mode", "lspatch.embedded", "lspatch.manager", 
+                    "lspatch.local", "lspatch.remote", "lspatch.version"
+                };
+                for (String prop : props) {
+                    String value = System.getProperty(prop);
+                    if (value != null) {
+                        status.append("  ").append(prop).append("=").append(value).append("\n");
+                    }
+                }
+            }
+            
+        } catch (Exception e) {
+            status.append("Error getting status: ").append(e.getMessage()).append("\n");
+        }
+        
+        return status.toString();
     }
 }

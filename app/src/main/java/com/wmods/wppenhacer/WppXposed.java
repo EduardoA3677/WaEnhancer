@@ -116,12 +116,29 @@ public class WppXposed implements IXposedHookLoadPackage, IXposedHookInitPackage
             XposedBridge.log("[•] This package: " + lpparam.packageName);
 
             if (LSPatchCompat.isLSPatchEnvironment()) {
-                XposedBridge.log("[LSPatch] Running in LSPatch mode: " + LSPatchCompat.getLSPatchMode());
+                LSPatchCompat.LSPatchMode mode = LSPatchCompat.getLSPatchMode();
+                XposedBridge.log("[LSPatch] Running in LSPatch mode: " + mode);
+                
+                // Enhanced LSPatch status logging
+                try {
+                    String detailedStatus = com.wmods.wppenhacer.xposed.core.LSPatchService.getDetailedLSPatchStatus();
+                    XposedBridge.log("[LSPatch] Detailed Status:\n" + detailedStatus);
+                } catch (Exception e) {
+                    XposedBridge.log("[LSPatch] Error getting detailed status: " + e.getMessage());
+                }
+                
+                // Verify LSPatch is actually working before proceeding
+                boolean lspatchWorking = com.wmods.wppenhacer.xposed.core.LSPatchService.isWaEnhancerLoaded();
+                if (!lspatchWorking) {
+                    XposedBridge.log("[LSPatch] WARNING: LSPatch environment detected but WaEnhancer hooks are not working!");
+                    XposedBridge.log("[LSPatch] This may indicate a configuration issue or unsupported LSPatch mode.");
+                    return; // Don't proceed if hooks aren't working
+                }
                 
                 // Apply LSPatch specific setup
-                if (LSPatchCompat.getLSPatchMode() == LSPatchCompat.LSPatchMode.LSPATCH_EMBEDDED) {
+                if (mode == LSPatchCompat.LSPatchMode.LSPATCH_EMBEDDED) {
                     XposedBridge.log("[LSPatch] Using embedded mode optimizations");
-                } else if (LSPatchCompat.getLSPatchMode() == LSPatchCompat.LSPatchMode.LSPATCH_MANAGER) {
+                } else if (mode == LSPatchCompat.LSPatchMode.LSPATCH_MANAGER) {
                     XposedBridge.log("[LSPatch] Using manager mode with bridge service");
                 }
                 
