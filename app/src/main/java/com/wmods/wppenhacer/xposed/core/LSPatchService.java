@@ -161,18 +161,13 @@ public class LSPatchService {
         try {
             Log.d(TAG, "Checking if WaEnhancer is loaded in LSPatch");
             
-            // Critical: First verify we're in WhatsApp context
-            Context context = getCurrentContext();
-            if (context == null) {
-                Log.w(TAG, "Cannot get current context");
+            // Critical: First verify we're in WhatsApp context with enhanced detection
+            if (!isWhatsAppPackageDetected()) {
+                Log.w(TAG, "Enhanced WhatsApp detection failed - not in WhatsApp context");
                 return false;
             }
             
-            String packageName = context.getPackageName();
-            if (!"com.whatsapp".equals(packageName) && !"com.whatsapp.w4b".equals(packageName)) {
-                Log.w(TAG, "Not in WhatsApp context: " + packageName);
-                return false;
-            }
+            Log.d(TAG, "WhatsApp context confirmed, proceeding with WaEnhancer detection");
             
             // Method 1: Check in LSPatch module list (most reliable if available)
             Object modulesList = getModulesList();
@@ -734,5 +729,120 @@ public class LSPatchService {
         }
         
         return status.toString();
+    }
+    
+    /**
+     * Enhanced WhatsApp package detection for LSPatch environments
+     * This method provides more reliable detection of WhatsApp application context
+     */
+    public static boolean isWhatsAppPackageDetected() {
+        try {
+            // Method 1: Check current application context
+            Context context = getCurrentContext();
+            if (context != null) {
+                String packageName = context.getPackageName();
+                if ("com.whatsapp".equals(packageName) || "com.whatsapp.w4b".equals(packageName)) {
+                    Log.d(TAG, "WhatsApp detected via application context: " + packageName);
+                    return true;
+                }
+            }
+            
+            // Method 2: Check process name
+            String processName = getCurrentProcessName();
+            if (processName != null) {
+                if ("com.whatsapp".equals(processName) || 
+                    "com.whatsapp.w4b".equals(processName) ||
+                    processName.startsWith("com.whatsapp")) {
+                    Log.d(TAG, "WhatsApp detected via process name: " + processName);
+                    return true;
+                }
+            }
+            
+            // Method 3: Check stack trace for WhatsApp classes
+            StackTraceElement[] stack = Thread.currentThread().getStackTrace();
+            for (StackTraceElement element : stack) {
+                String className = element.getClassName();
+                if (className.startsWith("com.whatsapp.")) {
+                    Log.d(TAG, "WhatsApp detected via stack trace: " + className);
+                    return true;
+                }
+            }
+            
+            // Method 4: Check classloader for WhatsApp specific classes
+            ClassLoader cl = Thread.currentThread().getContextClassLoader();
+            if (cl == null && context != null) {
+                cl = context.getClassLoader();
+            }
+            
+            if (cl != null) {
+                String[] whatsappIndicatorClasses = {
+                    "com.whatsapp.HomeActivity",
+                    "com.whatsapp.Main",
+                    "com.whatsapp.Conversation",
+                    "com.whatsapp.Voip",
+                    "com.whatsapp.conversationslist.ConversationsFragment"
+                };
+                
+                for (String className : whatsappIndicatorClasses) {
+                    try {
+                        Class<?> clazz = cl.loadClass(className);
+                        if (clazz != null) {
+                            Log.d(TAG, "WhatsApp detected via classloader: " + className);
+                            return true;
+                        }
+                    } catch (ClassNotFoundException e) {
+                        // Try alternative class paths for different WhatsApp versions
+                        if (className.equals("com.whatsapp.HomeActivity")) {
+                            try {
+                                cl.loadClass("com.whatsapp.home.ui.HomeActivity");
+                                Log.d(TAG, "WhatsApp detected via alternative HomeActivity");
+                                return true;
+                            } catch (ClassNotFoundException e2) {
+                                // Continue trying other classes
+                            }
+                        }
+                    }
+                }
+            }
+            
+            // Method 5: Check system properties set by LSPatch in WhatsApp context
+            try {
+                String targetPackage = System.getProperty("waenhancer.target.package");
+                if ("com.whatsapp".equals(targetPackage) || "com.whatsapp.w4b".equals(targetPackage)) {
+                    Log.d(TAG, "WhatsApp detected via system property");
+                    return true;
+                }
+            } catch (Exception e) {
+                // Property access might fail
+            }
+            
+            Log.w(TAG, "WhatsApp package detection failed - not in WhatsApp context");
+            return false;
+            
+        } catch (Exception e) {
+            Log.e(TAG, "Error in WhatsApp package detection: " + e.getMessage());
+            return false;
+        }
+    }
+    
+    /**
+     * Get the current process name
+     */
+    private static String getCurrentProcessName() {
+        try {
+            int pid = android.os.Process.myPid();
+            android.app.ActivityManager am = (android.app.ActivityManager) 
+                getCurrentContext().getSystemService(Context.ACTIVITY_SERVICE);
+            if (am != null) {
+                for (android.app.ActivityManager.RunningAppProcessInfo processInfo : am.getRunningAppProcesses()) {
+                    if (processInfo.pid == pid) {
+                        return processInfo.processName;
+                    }
+                }
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "Error getting current process name: " + e.getMessage());
+        }
+        return null;
     }
 }

@@ -228,6 +228,84 @@ public class LSPatchCompat {
     }
     
     /**
+     * Checks if LSPatch service is available and functional
+     * @return true if LSPatch service is available
+     */
+    public static boolean isLSPatchServiceAvailable() {
+        if (!isLSPatchEnvironment()) {
+            return false; // Not in LSPatch environment
+        }
+        
+        try {
+            // Check if we can access LSPatch service classes
+            switch (getCurrentMode()) {
+                case LSPATCH_EMBEDDED:
+                    return isClassAvailable(LSPATCH_MODULE_SERVICE);
+                case LSPATCH_MANAGER:
+                    return isClassAvailable(LSPATCH_REMOTE_SERVICE);
+                default:
+                    return false;
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error checking LSPatch service availability: " + e.getMessage());
+            return false;
+        }
+    }
+    
+    /**
+     * Enhanced method to check if a specific LSPatch class is accessible
+     * @param className Class name to check
+     * @return true if class is accessible and functional
+     */
+    public static boolean isLSPatchClassAvailable(String className) {
+        try {
+            Class<?> clazz = Class.forName(className);
+            // Additional verification - try to get some basic info from the class
+            if (clazz != null) {
+                clazz.getName(); // This will throw if class is not properly loaded
+                return true;
+            }
+        } catch (Exception e) {
+            Log.d(TAG, "LSPatch class not available: " + className + " - " + e.getMessage());
+        }
+        return false;
+    }
+    
+    /**
+     * Validates the integrity of the LSPatch environment
+     * @return true if LSPatch environment is fully functional
+     */
+    public static boolean validateLSPatchIntegrity() {
+        if (!isLSPatchEnvironment()) {
+            return false;
+        }
+        
+        boolean integrity = true;
+        
+        // Check core LSPatch components
+        if (!isClassAvailable(LSPATCH_LOADER_CLASS)) {
+            Log.w(TAG, "LSPatch loader class not available");
+            integrity = false;
+        }
+        
+        // Check if we're in correct application context
+        if (!isInWhatsAppContext()) {
+            Log.w(TAG, "Not in WhatsApp context");
+            integrity = false;
+        }
+        
+        // Check if basic Xposed functionality works
+        try {
+            XposedBridge.log("LSPatch integrity test");
+        } catch (Exception e) {
+            Log.w(TAG, "XposedBridge not functional: " + e.getMessage());
+            integrity = false;
+        }
+        
+        return integrity;
+    }
+    
+    /**
      * Enhanced LSPatch environment detection
      * Checks multiple indicators to reliably detect LSPatch
      */

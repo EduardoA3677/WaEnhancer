@@ -1,45 +1,77 @@
 {
   "lspatch_compatibility": {
-    "version": "1.0.0",
+    "version": "1.1.0",
     "supported_modes": ["embedded", "manager"],
+    "validation_enabled": true,
     "features": {
       "RESOURCE_HOOKS": {
         "available": true,
         "description": "Resource hooks support",
         "limitations": "May not work with all resource types in LSPatch",
-        "fallback": "Use alternative resource access methods"
+        "fallback": "Use alternative resource access methods",
+        "validation_method": "test_resource_access"
       },
       "SYSTEM_HOOKS": {
         "available": false,
         "description": "System-level hooks (ScopeHook, AndroidPermissions)",
         "limitations": "Not compatible with LSPatch due to security model",
-        "fallback": "Skip system hooks in LSPatch environment"
+        "fallback": "Skip system hooks in LSPatch environment",
+        "validation_method": "skip_validation"
       },
       "BRIDGE_SERVICE": {
         "available": true,
         "description": "Bridge service communication",
         "limitations": "May require fallback methods in embedded mode",
-        "fallback": "Use LSPatch services directly"
+        "fallback": "Use LSPatch services directly",
+        "validation_method": "test_bridge_connectivity"
       },
       "XPOSED_PREFERENCES": {
         "available": false,
         "description": "Traditional XSharedPreferences",
         "limitations": "Not functional in LSPatch",
-        "fallback": "Use LSPatchPreferences wrapper"
+        "fallback": "Use LSPatchPreferences wrapper",
+        "validation_method": "test_preference_access"
       },
       "BOOTLOADER_SPOOFER": {
         "available": true,
         "description": "Bootloader spoofing functionality",
         "limitations": "Requires additional verification in LSPatch",
-        "fallback": "Enhanced compatibility checks"
+        "fallback": "Enhanced compatibility checks",
+        "validation_method": "test_spoof_capability",
+        "required_mode": "manager"
       },
       "MODULE_DETECTION": {
         "available": true,
         "description": "Module activation detection",
         "limitations": "Uses different detection methods",
-        "fallback": "LSPatch-specific module detection"
+        "fallback": "LSPatch-specific module detection",
+        "validation_method": "test_module_activation"
+      },
+      "WHATSAPP_INTEGRATION": {
+        "available": true,
+        "description": "WhatsApp integration hooks",
+        "limitations": "Requires WhatsApp context verification",
+        "fallback": "Enhanced context validation",
+        "validation_method": "test_whatsapp_classes"
+      },
+      "FEATURE_VALIDATION": {
+        "available": true,
+        "description": "Automatic feature validation",
+        "limitations": "May skip incompatible features",
+        "fallback": "Graceful degradation",
+        "validation_method": "comprehensive_validation"
       }
     },
+    "critical_features": [
+      "anti_revoke",
+      "hide_seen",
+      "show_online",
+      "download_profile",
+      "media_quality",
+      "status_download"
+    ],
+    "limited_features": ["bootloader_spoofer", "anti_wa_features", "custom_theme_v2", "custom_privacy_system"],
+    "incompatible_features": ["system_permissions_mod", "android_scope_hooks", "kernel_level_hooks"],
     "optimizations": {
       "hook_stability": {
         "enabled": true,
@@ -69,6 +101,77 @@
     "service_priorities": {
       "embedded_mode": ["LocalApplicationService", "ProviderClient", "BridgeClient"],
       "manager_mode": ["RemoteApplicationService", "BridgeClient", "ProviderClient"]
+    }
+  },
+  "whatsapp_integration": {
+    "package_detection": {
+      "primary_packages": ["com.whatsapp", "com.whatsapp.w4b"],
+      "detection_methods": [
+        "application_context",
+        "process_name",
+        "classloader_analysis",
+        "stack_trace_inspection",
+        "system_properties"
+      ],
+      "enhanced_detection": true,
+      "context_verification": true
+    },
+    "hook_management": {
+      "stability_mode": true,
+      "hook_verification": true,
+      "error_recovery": true,
+      "priority_optimization": true,
+      "compatibility_checks": true
+    },
+    "feature_compatibility": {
+      "antirevoke": {
+        "lspatch": true,
+        "lsposed": true,
+        "requirements": ["message_hooks"]
+      },
+      "custom_themes": {
+        "lspatch": "limited",
+        "lsposed": true,
+        "requirements": ["resource_hooks"]
+      },
+      "privacy_features": {
+        "lspatch": true,
+        "lsposed": true,
+        "requirements": ["receipt_hooks", "typing_hooks"]
+      },
+      "download_features": {
+        "lspatch": true,
+        "lsposed": true,
+        "requirements": ["media_hooks", "status_hooks"]
+      },
+      "bootloader_spoofer": {
+        "lspatch": "limited",
+        "lsposed": true,
+        "requirements": ["system_access"]
+      }
+    },
+    "bridges_and_receivers": {
+      "bridge_service": {
+        "available": true,
+        "fallback_methods": ["provider_client", "direct_service"],
+        "communication_mode": "auto"
+      },
+      "receivers": {
+        "waf_receiver": {
+          "enabled": true,
+          "compatibility": "full"
+        },
+        "module_receiver": {
+          "enabled": true,
+          "compatibility": "auto"
+        }
+      },
+      "providers": {
+        "hook_provider": {
+          "enabled": true,
+          "export_level": "safe"
+        }
+      }
     }
   }
 }

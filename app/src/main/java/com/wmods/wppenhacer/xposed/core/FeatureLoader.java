@@ -332,6 +332,95 @@ public class FeatureLoader {
     }
 
     private static void registerReceivers() {
+        try {
+            // Enhanced receiver registration with LSPatch compatibility
+            if (LSPatchCompat.isLSPatchEnvironment()) {
+                XposedBridge.log("Registering receivers with LSPatch compatibility");
+                registerLSPatchCompatibleReceivers();
+            } else {
+                XposedBridge.log("Registering standard receivers");
+                registerStandardReceivers();
+            }
+        } catch (Exception e) {
+            XposedBridge.log("Failed to register receivers: " + e.getMessage());
+            XposedBridge.log(e);
+        }
+    }
+    
+    /**
+     * Register receivers with LSPatch-specific adaptations
+     */
+    private static void registerLSPatchCompatibleReceivers() {
+        try {
+            // Reboot receiver with LSPatch adaptations
+            BroadcastReceiver restartReceiver = new BroadcastReceiver() {
+                @Override
+                public void onReceive(Context context, Intent intent) {
+                    try {
+                        if (context.getPackageName().equals(intent.getStringExtra("PKG"))) {
+                            var appName = context.getPackageManager().getApplicationLabel(context.getApplicationInfo());
+                            String message = "LSPatch: " + context.getString(ResId.string.rebooting) + " " + appName + "...";
+                            Toast.makeText(context, message, Toast.LENGTH_SHORT).show();
+                            
+                            // LSPatch-specific restart mechanism
+                            if (!performLSPatchRestart(context)) {
+                                Toast.makeText(context, "Unable to restart " + appName + " in LSPatch mode", Toast.LENGTH_SHORT).show();
+                            }
+                        }
+                    } catch (Exception e) {
+                        XposedBridge.log("LSPatch restart receiver error: " + e.getMessage());
+                    }
+                }
+            };
+            
+            // WPP receiver with enhanced LSPatch status reporting
+            BroadcastReceiver wppReceiver = new BroadcastReceiver() {
+                @Override
+                public void onReceive(Context context, Intent intent) {
+                    try {
+                        sendLSPatchEnabledBroadcast(context);
+                    } catch (Exception e) {
+                        XposedBridge.log("LSPatch WPP receiver error: " + e.getMessage());
+                    }
+                }
+            };
+            
+            // Manual restart receiver with LSPatch support
+            BroadcastReceiver restartManualReceiver = new BroadcastReceiver() {
+                @Override
+                public void onReceive(Context context, Intent intent) {
+                    try {
+                        WppCore.setPrivBoolean("need_restart", true);
+                        WppCore.setPrivBoolean("lspatch_restart_requested", true);
+                    } catch (Exception e) {
+                        XposedBridge.log("LSPatch manual restart receiver error: " + e.getMessage());
+                    }
+                }
+            };
+            
+            // Register receivers with LSPatch-compatible flags
+            int receiverFlags = ContextCompat.RECEIVER_EXPORTED;
+            
+            ContextCompat.registerReceiver(mApp, restartReceiver, 
+                new IntentFilter(BuildConfig.APPLICATION_ID + ".WHATSAPP.RESTART"), receiverFlags);
+            ContextCompat.registerReceiver(mApp, wppReceiver, 
+                new IntentFilter(BuildConfig.APPLICATION_ID + ".CHECK_WPP"), receiverFlags);
+            ContextCompat.registerReceiver(mApp, restartManualReceiver, 
+                new IntentFilter(BuildConfig.APPLICATION_ID + ".MANUAL_RESTART"), receiverFlags);
+                
+            XposedBridge.log("LSPatch-compatible receivers registered successfully");
+            
+        } catch (Exception e) {
+            XposedBridge.log("Failed to register LSPatch receivers: " + e.getMessage());
+            // Fallback to standard receivers
+            registerStandardReceivers();
+        }
+    }
+    
+    /**
+     * Register standard receivers for traditional Xposed
+     */
+    private static void registerStandardReceivers() {
         // Reboot receiver
         BroadcastReceiver restartReceiver = new BroadcastReceiver() {
             @Override
@@ -364,7 +453,61 @@ public class FeatureLoader {
         };
         ContextCompat.registerReceiver(mApp, restartManualReceiver, new IntentFilter(BuildConfig.APPLICATION_ID + ".MANUAL_RESTART"), ContextCompat.RECEIVER_EXPORTED);
     }
+    
+    /**
+     * Perform LSPatch-specific restart
+     */
+    private static boolean performLSPatchRestart(Context context) {
+        try {
+            // In LSPatch, we may need different restart mechanisms
+            if (LSPatchCompat.getCurrentMode() == LSPatchCompat.LSPatchMode.LSPATCH_MANAGER) {
+                // For manager mode, try to use LSPatch bridge
+                if (LSPatchBridge.isInitialized()) {
+                    return LSPatchBridge.requestRestart();
+                }
+            }
+            
+            // Fallback to standard restart
+            return Utils.doRestart(context);
+            
+        } catch (Exception e) {
+            XposedBridge.log("LSPatch restart failed: " + e.getMessage());
+            return false;
+        }
+    }
+    
+    /**
+     * Send enhanced broadcast with LSPatch status information
+     */
+    private static void sendLSPatchEnabledBroadcast(Context context) {
+        try {
+            Intent wppIntent = new Intent(BuildConfig.APPLICATION_ID + ".RECEIVER_WPP");
+            wppIntent.putExtra("VERSION", context.getPackageManager().getPackageInfo(context.getPackageName(), 0).versionName);
+            wppIntent.putExtra("PKG", context.getPackageName());
+            
+            // Add LSPatch-specific information
+            wppIntent.putExtra("LSPATCH_MODE", LSPatchCompat.isLSPatchEnvironment());
+            if (LSPatchCompat.isLSPatchEnvironment()) {
+                wppIntent.putExtra("LSPATCH_TYPE", LSPatchCompat.getCurrentMode().toString());
+                wppIntent.putExtra("LSPATCH_SERVICE", LSPatchCompat.isLSPatchServiceAvailable());
+                wppIntent.putExtra("LSPATCH_BRIDGE", LSPatchBridge.isInitialized());
+            }
+            
+            wppIntent.setPackage(BuildConfig.APPLICATION_ID);
+            context.sendBroadcast(wppIntent);
+            
+            XposedBridge.log("LSPatch status broadcast sent successfully");
+            
+        } catch (Exception e) {
+            XposedBridge.log("Failed to send LSPatch broadcast: " + e.getMessage());
+            // Fallback to standard broadcast
+            sendEnabledBroadcast(context);
+        }
+    }
 
+    /**
+     * Standard broadcast method for compatibility
+     */
     private static void sendEnabledBroadcast(Context context) {
         try {
             Intent wppIntent = new Intent(BuildConfig.APPLICATION_ID + ".RECEIVER_WPP");
@@ -373,6 +516,23 @@ public class FeatureLoader {
             wppIntent.setPackage(BuildConfig.APPLICATION_ID);
             context.sendBroadcast(wppIntent);
         } catch (Exception ignored) {
+        }
+    }
+    
+    /**
+     * Add error to the error list for reporting
+     */
+    private static void addError(String pluginName, String error, String message) {
+        try {
+            ErrorItem errorItem = new ErrorItem();
+            errorItem.setPluginName(pluginName);
+            errorItem.setError(error);
+            errorItem.setMessage(message);
+            errorItem.setWhatsAppVersion(currentVersion);
+            errorItem.setModuleVersion(BuildConfig.VERSION_NAME);
+            list.add(errorItem);
+        } catch (Exception e) {
+            XposedBridge.log("Failed to add error to list: " + e.getMessage());
         }
     }
 
@@ -564,6 +724,188 @@ public class FeatureLoader {
         } catch (Throwable e) {
             XposedBridge.log("LSPatch-safe hook failed for " + plugin.getClass().getSimpleName() + ": " + e.getMessage());
             throw e;
+        }
+    }
+
+    /**
+     * Load a feature with enhanced error handling and validation
+     */
+    private static void loadFeatureSafely(Feature feature) {
+        if (feature == null) {
+            XposedBridge.log("Attempted to load null feature");
+            return;
+        }
+        
+        try {
+            // Use the enhanced doHook method with validation
+            boolean success = feature.safeDoHook();
+            
+            if (success) {
+                String logMessage = String.format("✓ %s loaded successfully", feature.getPluginName());
+                if (LSPatchCompat.isLSPatchEnvironment()) {
+                    logMessage += " (LSPatch compatible)";
+                }
+                XposedBridge.log(logMessage);
+            } else {
+                String logMessage = String.format("⚠ %s failed to load", feature.getPluginName());
+                if (LSPatchCompat.isLSPatchEnvironment()) {
+                    logMessage += " (LSPatch compatibility issue)";
+                }
+                XposedBridge.log(logMessage);
+                
+                // Add to error list for reporting
+                addError(feature.getPluginName(), "Feature initialization failed", "Compatibility issue");
+            }
+            
+        } catch (Throwable e) {
+            String errorMessage = String.format("✗ %s failed with exception: %s", 
+                feature.getPluginName(), e.getMessage());
+                
+            XposedBridge.log(errorMessage);
+            XposedBridge.log(e);
+            
+            addError(feature.getPluginName(), e.getClass().getSimpleName(), e.getMessage());
+        }
+    }
+    
+    /**
+     * Enhanced feature loading with LSPatch-specific optimizations
+     */
+    private static void loadAllFeatures(ClassLoader loader, XSharedPreferences pref) {
+        XposedBridge.log("Starting feature loading process...");
+        
+        if (LSPatchCompat.isLSPatchEnvironment()) {
+            XposedBridge.log("Loading features with LSPatch optimizations");
+            
+            // Apply LSPatch-specific optimizations
+            LSPatchCompat.optimizeForLSPatch();
+        }
+        
+        int totalFeatures = 0;
+        int successfulFeatures = 0;
+        
+        try {
+            // Core features (highest priority)
+            Feature[] coreFeatures = {
+                new Others(loader, pref),
+                new AntiRevoke(loader, pref),
+                new SeenTick(loader, pref),
+                new ShowOnline(loader, pref)
+            };
+            
+            XposedBridge.log("Loading core features...");
+            for (Feature feature : coreFeatures) {
+                totalFeatures++;
+                loadFeatureSafely(feature);
+                if (feature.validateFeatureCompatibility()) {
+                    successfulFeatures++;
+                }
+            }
+            
+            // Privacy features
+            Feature[] privacyFeatures = {
+                new CustomPrivacy(loader, pref),
+                new HideChat(loader, pref),
+                new CallPrivacy(loader, pref),
+                new TagMessage(loader, pref),
+                new AntiWa(loader, pref)
+            };
+            
+            XposedBridge.log("Loading privacy features...");
+            for (Feature feature : privacyFeatures) {
+                totalFeatures++;
+                loadFeatureSafely(feature);
+                if (feature.validateFeatureCompatibility()) {
+                    successfulFeatures++;
+                }
+            }
+            
+            // Media features
+            Feature[] mediaFeatures = {
+                new MediaPreview(loader, pref),
+                new DownloadViewOnce(loader, pref),
+                new MediaQuality(loader, pref)
+            };
+            
+            XposedBridge.log("Loading media features...");
+            for (Feature feature : mediaFeatures) {
+                totalFeatures++;
+                loadFeatureSafely(feature);
+                if (feature.validateFeatureCompatibility()) {
+                    successfulFeatures++;
+                }
+            }
+            
+            // Customization features (may have more limitations in LSPatch)
+            Feature[] customFeatures = {
+                new CustomThemeV2(loader, pref),
+                new BubbleColors(loader, pref),
+                new CustomView(loader, pref),
+                new CustomToolbar(loader, pref),
+                new FilterGroups(loader, pref),
+                new SeparateGroup(loader, pref)
+            };
+            
+            XposedBridge.log("Loading customization features...");
+            for (Feature feature : customFeatures) {
+                totalFeatures++;
+                // Check LSPatch compatibility for customization features
+                if (LSPatchCompat.isLSPatchEnvironment() && 
+                    LSPatchCompat.getCurrentMode() == LSPatchCompat.LSPatchMode.LSPATCH_EMBEDDED) {
+                    // Some customization features may not work in embedded mode
+                    XposedBridge.log("Skipping " + feature.getPluginName() + " in LSPatch embedded mode");
+                    continue;
+                }
+                loadFeatureSafely(feature);
+                if (feature.validateFeatureCompatibility()) {
+                    successfulFeatures++;
+                }
+            }
+            
+            // Other features
+            Feature[] otherFeatures = {
+                new ChatFilters(loader, pref),
+                new CopyStatus(loader, pref),
+                new GoogleTranslate(loader, pref),
+                new ToastViewer(loader, pref),
+                new Tasker(loader, pref),
+                new NewChat(loader, pref),
+                new CallType(loader, pref),
+                new ShareLimit(loader, pref),
+                new PinnedLimit(loader, pref),
+                new ChatLimit(loader, pref),
+                new ShowEditMessage(loader, pref),
+                new Channels(loader, pref),
+                new MenuStatus(loader, pref),
+                new DeleteStatus(loader, pref),
+                new TextStatusComposer(loader, pref),
+                new IGStatus(loader, pref),
+                new HideTabs(loader, pref),
+                new HideSeenView(loader, pref),
+                new CustomTime(loader, pref),
+                new LiteMode(loader, pref)
+            };
+            
+            XposedBridge.log("Loading additional features...");
+            for (Feature feature : otherFeatures) {
+                totalFeatures++;
+                loadFeatureSafely(feature);
+                if (feature.validateFeatureCompatibility()) {
+                    successfulFeatures++;
+                }
+            }
+            
+        } catch (Exception e) {
+            XposedBridge.log("Error during feature loading: " + e.getMessage());
+            XposedBridge.log(e);
+        }
+        
+        // Log summary
+        XposedBridge.log(String.format("Feature loading completed: %d/%d features loaded successfully", 
+            successfulFeatures, totalFeatures));
+            
+        if (LSPatchCompat.isLSPatchEnvironment()) {
+            XposedBridge.log("LSPatch compatibility mode active");
         }
     }
 

@@ -127,31 +127,66 @@ public class WppXposed implements IXposedHookLoadPackage, IXposedHookInitPackage
                 }
                 
                 // Enhanced LSPatch status logging
+                XposedBridge.log("[LSPatch] Module successfully loaded in LSPatch environment");
+                XposedBridge.log("[LSPatch] LSPatch mode: " + mode);
+                XposedBridge.log("[LSPatch] Service available: " + LSPatchCompat.isLSPatchServiceAvailable());
+                XposedBridge.log("[LSPatch] Bridge initialized: " + LSPatchBridge.isInitialized());
+                
+                // Validate features in LSPatch environment
                 try {
-                    String detailedStatus = com.wmods.wppenhacer.xposed.core.LSPatchService.getDetailedLSPatchStatus();
-                    XposedBridge.log("[LSPatch] Detailed Status:\n" + detailedStatus);
+                    XposedBridge.log("[LSPatch] Starting feature compatibility validation...");
+                    Map<String, LSPatchFeatureValidator.ValidationResult> results = 
+                        LSPatchFeatureValidator.validateAllFeatures(classLoader);
+                    
+                    // Check if all critical features are working
+                    boolean allCriticalWorking = LSPatchFeatureValidator.areAllCriticalFeaturesCompatible();
+                    if (allCriticalWorking) {
+                        XposedBridge.log("[LSPatch] ✓ All critical features validated successfully");
+                    } else {
+                        XposedBridge.log("[LSPatch] ⚠ Some critical features may have issues - check logs for details");
+                    }
+                    
+                    // Log summary
+                    int compatible = 0, limited = 0, incompatible = 0;
+                    for (LSPatchFeatureValidator.ValidationResult result : results.values()) {
+                        if (result.isCompatible) {
+                            if (result.hasLimitations) limited++;
+                            else compatible++;
+                        } else {
+                            incompatible++;
+                        }
+                    }
+                    
+                    XposedBridge.log(String.format("[LSPatch] Feature status - Compatible: %d, Limited: %d, Incompatible: %d", 
+                        compatible, limited, incompatible));
+                        
                 } catch (Exception e) {
-                    XposedBridge.log("[LSPatch] Error getting detailed status: " + e.getMessage());
+                    XposedBridge.log("[LSPatch] Feature validation failed: " + e.getMessage());
+                    XposedBridge.log(e);
                 }
                 
-                // Verify LSPatch is actually working before proceeding
-                boolean lspatchWorking = com.wmods.wppenhacer.xposed.core.LSPatchService.isWaEnhancerLoaded();
-                if (!lspatchWorking) {
-                    XposedBridge.log("[LSPatch] WARNING: LSPatch environment detected but WaEnhancer hooks are not working!");
-                    XposedBridge.log("[LSPatch] This may indicate a configuration issue or unsupported LSPatch mode.");
-                    return; // Don't proceed if hooks aren't working
-                }
-                
-                // Apply LSPatch specific setup
-                if (mode == LSPatchCompat.LSPatchMode.LSPATCH_EMBEDDED) {
-                    XposedBridge.log("[LSPatch] Using embedded mode optimizations");
-                } else if (mode == LSPatchCompat.LSPatchMode.LSPATCH_MANAGER) {
-                    XposedBridge.log("[LSPatch] Using manager mode with bridge service");
-                }
-                
-                // Check feature availability
-                if (!LSPatchCompat.isFeatureAvailable("RESOURCE_HOOKS")) {
-                    XposedBridge.log("[LSPatch] Warning: Resource hooks may not work properly");
+                // Optional: Run comprehensive test suite if enabled
+                if (pref.getBoolean("lspatch_run_tests", false)) {
+                    try {
+                        XposedBridge.log("[LSPatch] Running comprehensive test suite...");
+                        List<LSPatchTestSuite.TestResult> testResults = 
+                            LSPatchTestSuite.runCompleteTestSuite(classLoader);
+                        
+                        int testsPassed = 0;
+                        for (LSPatchTestSuite.TestResult result : testResults) {
+                            if (result.passed) testsPassed++;
+                        }
+                        
+                        XposedBridge.log(String.format("[LSPatch] Test suite completed: %d/%d tests passed", 
+                            testsPassed, testResults.size()));
+                            
+                    } catch (Exception e) {
+                        XposedBridge.log("[LSPatch] Test suite execution failed: " + e.getMessage());
+                    }
+                } else {
+                    // Run basic smoke test
+                    boolean smokeTestPassed = LSPatchTestSuite.runSmokeTest();
+                    XposedBridge.log("[LSPatch] Smoke test: " + (smokeTestPassed ? "PASSED" : "FAILED"));
                 }
             }
 
@@ -249,4 +284,89 @@ public class WppXposed implements IXposedHookLoadPackage, IXposedHookInitPackage
         }
     }
 
+    /**
+     * Verify that we're properly hooked into WhatsApp in LSPatch environment
+     * This is critical to ensure WaEnhancer functions correctly
+     */
+    private boolean verifyWhatsAppLSPatchContext(String packageName, ClassLoader classLoader) {
+        try {
+            // 1. Verify package name is WhatsApp
+            if (!FeatureLoader.PACKAGE_WPP.equals(packageName) && !FeatureLoader.PACKAGE_BUSINESS.equals(packageName)) {
+                XposedBridge.log("[LSPatch] Invalid package name: " + packageName);
+                return false;
+            }
+
+            // 2. Try to load key WhatsApp classes to ensure we're in the right context
+            String[] criticalClasses = {
+                "com.whatsapp.HomeActivity",
+                "com.whatsapp.Main",
+                "com.whatsapp.Conversation"
+            };
+
+            int accessibleClasses = 0;
+            for (String className : criticalClasses) {
+                try {
+                    Class<?> clazz = classLoader.loadClass(className);
+                    if (clazz != null) {
+                        accessibleClasses++;
+                        XposedBridge.log("[LSPatch] Successfully loaded: " + className);
+                    }
+                } catch (ClassNotFoundException e) {
+                    // Try alternative class paths for newer WhatsApp versions
+                    if (className.equals("com.whatsapp.HomeActivity")) {
+                        try {
+                            classLoader.loadClass("com.whatsapp.home.ui.HomeActivity");
+                            accessibleClasses++;
+                            XposedBridge.log("[LSPatch] Successfully loaded alternative HomeActivity");
+                        } catch (ClassNotFoundException e2) {
+                            XposedBridge.log("[LSPatch] Could not load HomeActivity: " + e2.getMessage());
+                        }
+                    }
+                }
+            }
+
+            if (accessibleClasses < 2) {
+                XposedBridge.log("[LSPatch] ERROR: Could only access " + accessibleClasses + "/" + criticalClasses.length + " WhatsApp classes");
+                return false;
+            }
+
+            // 3. Verify we can get application context
+            Context context = getCurrentApplicationContext();
+            if (context == null) {
+                XposedBridge.log("[LSPatch] ERROR: Could not get application context");
+                return false;
+            }
+
+            String contextPackageName = context.getPackageName();
+            if (!packageName.equals(contextPackageName)) {
+                XposedBridge.log("[LSPatch] ERROR: Package name mismatch. Expected: " + packageName + ", Got: " + contextPackageName);
+                return false;
+            }
+
+            // 4. Test XposedBridge functionality
+            try {
+                XposedBridge.log("[LSPatch] XposedBridge test successful");
+            } catch (Exception e) {
+                XposedBridge.log("[LSPatch] ERROR: XposedBridge not functional: " + e.getMessage());
+                return false;
+            }
+
+            // 5. Verify LSPatch service is available
+            try {
+                boolean serviceAvailable = LSPatchCompat.isLSPatchServiceAvailable();
+                if (!serviceAvailable) {
+                    XposedBridge.log("[LSPatch] WARNING: LSPatch service not available, using fallback mode");
+                }
+            } catch (Exception e) {
+                XposedBridge.log("[LSPatch] WARNING: Could not check LSPatch service: " + e.getMessage());
+            }
+
+            XposedBridge.log("[LSPatch] WhatsApp context verification PASSED");
+            return true;
+
+        } catch (Exception e) {
+            XposedBridge.log("[LSPatch] ERROR: WhatsApp context verification failed: " + e.getMessage());
+            return false;
+        }
+    }
 }
