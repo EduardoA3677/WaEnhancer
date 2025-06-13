@@ -145,7 +145,7 @@ public class MainActivity extends BaseActivity {
                         "Module status check:\n" + LSPatchModuleStatus.getDetailedStatus());
             }
 
-            return status.isActive();
+            return LSPatchModuleStatus.isModuleActive();
 
         } catch (Exception e) {
             // Fallback to the original detection method
@@ -257,7 +257,18 @@ public class MainActivity extends BaseActivity {
     public static String getModuleStatusText() {
         try {
             LSPatchModuleStatus.ModuleStatus status = LSPatchModuleStatus.getCurrentStatus();
-            return status.getDisplayName();
+            switch (status) {
+                case ACTIVE_LSPATCH:
+                    return "Active (LSPatch)";
+                case ACTIVE_XPOSED:
+                    return "Active (Xposed)";
+                case INACTIVE:
+                    return "Inactive";
+                case ERROR:
+                    return "Error";
+                default:
+                    return "Unknown";
+            }
         } catch (Exception e) {
             return isXposedEnabled() ? "Active" : "Inactive";
         }

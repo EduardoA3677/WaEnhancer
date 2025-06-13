@@ -339,3 +339,130 @@ class NoOpEditor implements SharedPreferences.Editor {
         Log.w(TAG, "Edit operation not supported: apply()");
     }
 }
+
+/**
+ * LSPatch-compatible SharedPreferences implementation
+ * 
+ * This class provides a bridge between Xposed XSharedPreferences and 
+ * Android SharedPreferences for LSPatch compatibility
+ */
+public class LSPatchPreferencesImpl implements SharedPreferences {
+    private static final String TAG = "LSPatchPreferencesImpl";
+    
+    private SharedPreferences mDelegate;
+    
+    /**
+     * Constructor for context-based preferences (LSPatch mode)
+     */
+    public LSPatchPreferencesImpl(android.content.Context context, String prefName) {
+        try {
+            if (context != null) {
+                mDelegate = context.getSharedPreferences(prefName, android.content.Context.MODE_PRIVATE);
+                Log.d(TAG, "Initialized with Context-based SharedPreferences");
+            } else {
+                Log.w(TAG, "Context is null, falling back to fallback preferences");
+                mDelegate = new FallbackSharedPreferences();
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "Failed to initialize SharedPreferences, using fallback: " + e.getMessage());
+            mDelegate = new FallbackSharedPreferences();
+        }
+    }
+    
+    /**
+     * Constructor for file-based preferences (fallback mode)
+     */
+    public LSPatchPreferencesImpl(String filePath) {
+        try {
+            if (filePath != null) {
+                mDelegate = new FileBasedSharedPreferences(new java.io.File(filePath));
+                Log.d(TAG, "Initialized with file-based preferences: " + filePath);
+            } else {
+                mDelegate = new FallbackSharedPreferences();
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "Failed to initialize file-based preferences, using fallback: " + e.getMessage());
+            mDelegate = new FallbackSharedPreferences();
+        }
+    }
+    
+    /**
+     * Constructor for File-based preferences
+     */
+    public LSPatchPreferencesImpl(java.io.File file) {
+        try {
+            if (file != null) {
+                mDelegate = new FileBasedSharedPreferences(file);
+                Log.d(TAG, "Initialized with File object");
+            } else {
+                mDelegate = new FallbackSharedPreferences();
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "Failed to initialize File-based preferences, using fallback: " + e.getMessage());
+            mDelegate = new FallbackSharedPreferences();
+        }
+    }
+    
+    public boolean isFunctional() {
+        return mDelegate != null;
+    }
+    
+    @Override
+    public Map<String, ?> getAll() {
+        return mDelegate != null ? mDelegate.getAll() : new HashMap<>();
+    }
+    
+    @Override
+    public String getString(String key, String defValue) {
+        return mDelegate != null ? mDelegate.getString(key, defValue) : defValue;
+    }
+    
+    @Override
+    public Set<String> getStringSet(String key, Set<String> defValues) {
+        return mDelegate != null ? mDelegate.getStringSet(key, defValues) : defValues;
+    }
+    
+    @Override
+    public int getInt(String key, int defValue) {
+        return mDelegate != null ? mDelegate.getInt(key, defValue) : defValue;
+    }
+    
+    @Override
+    public long getLong(String key, long defValue) {
+        return mDelegate != null ? mDelegate.getLong(key, defValue) : defValue;
+    }
+    
+    @Override
+    public float getFloat(String key, float defValue) {
+        return mDelegate != null ? mDelegate.getFloat(key, defValue) : defValue;
+    }
+    
+    @Override
+    public boolean getBoolean(String key, boolean defValue) {
+        return mDelegate != null ? mDelegate.getBoolean(key, defValue) : defValue;
+    }
+    
+    @Override
+    public boolean contains(String key) {
+        return mDelegate != null && mDelegate.contains(key);
+    }
+    
+    @Override
+    public Editor edit() {
+        return mDelegate != null ? mDelegate.edit() : new NoOpEditor();
+    }
+    
+    @Override
+    public void registerOnSharedPreferenceChangeListener(OnSharedPreferenceChangeListener listener) {
+        if (mDelegate != null) {
+            mDelegate.registerOnSharedPreferenceChangeListener(listener);
+        }
+    }
+    
+    @Override
+    public void unregisterOnSharedPreferenceChangeListener(OnSharedPreferenceChangeListener listener) {
+        if (mDelegate != null) {
+            mDelegate.unregisterOnSharedPreferenceChangeListener(listener);
+        }
+    }
+}
