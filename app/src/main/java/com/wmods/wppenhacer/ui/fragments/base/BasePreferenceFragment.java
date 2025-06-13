@@ -178,22 +178,54 @@ public abstract class BasePreferenceFragment extends PreferenceFragmentCompat im
         try {
             LSPatchCompat.init();
             if (LSPatchCompat.isLSPatchEnvironment()) {
-                // Disable features that require system server hooks
-                setPreferenceState("bootloader_spoofer", false);
-                setPreferenceState("bootloader_spoofer_custom", false);
+                // Remove/hide features that require system server hooks
+                removePreferenceIfExists("bootloader_spoofer");
+                removePreferenceIfExists("bootloader_spoofer_custom");
+                removePreferenceIfExists("bootloader_spoofer_xml");
 
                 // Features with limited functionality in LSPatch manager mode
                 if (LSPatchCompat.getCurrentMode() == LSPatchCompat.LSPatchMode.LSPATCH_MANAGER) {
                     // Resource-related features may have limited functionality
-                    setPreferenceState("custom_css", false);
-                    setPreferenceState("wallpaper", false);
+                    markFeatureAsLimited("custom_css", "Limited resource access in LSPatch manager mode");
+                    markFeatureAsLimited("wallpaper", "Limited resource access in LSPatch manager mode");
+                    markFeatureAsLimited("custom_filters", "Limited functionality in LSPatch manager mode");
+                } else {
+                    // Embedded mode warnings
+                    markFeatureAsLimited("custom_filters", "May have some limitations in LSPatch");
                 }
-
-                // Mark feature as having limitations
-                markFeatureAsLimited("custom_filters", "May have limited functionality in LSPatch");
             }
         } catch (Exception e) {
             // LSPatch classes may not be available in UI context, ignore
+        }
+    }
+
+    /**
+     * Removes a preference if it exists
+     */
+    private void removePreferenceIfExists(String key) {
+        var pref = findPreference(key);
+        if (pref != null && getPreferenceScreen() != null) {
+            // Try to remove from the main preference screen
+            if (!getPreferenceScreen().removePreference(pref)) {
+                // If not found, search in categories
+                removeFromCategories(key, getPreferenceScreen());
+            }
+        }
+    }
+
+    /**
+     * Recursively removes a preference from categories
+     */
+    private void removeFromCategories(String key, androidx.preference.PreferenceGroup group) {
+        for (int i = 0; i < group.getPreferenceCount(); i++) {
+            var pref = group.getPreference(i);
+            if (key.equals(pref.getKey())) {
+                group.removePreference(pref);
+                return;
+            }
+            if (pref instanceof androidx.preference.PreferenceGroup) {
+                removeFromCategories(key, (androidx.preference.PreferenceGroup) pref);
+            }
         }
     }
 

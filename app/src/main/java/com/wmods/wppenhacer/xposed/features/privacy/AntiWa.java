@@ -22,7 +22,17 @@ public class AntiWa extends Feature {
 
     @Override
     public void doHook() throws Throwable {
+        // Check LSPatch compatibility first
+        if (!checkLSPatchSupport()) {
+            logDebug("AntiWa feature disabled - not compatible with LSPatch environment");
+            return;
+        }
+        
         if (!prefs.getBoolean("bootloader_spoofer", false)) return;
+        
+        // Log LSPatch compatibility info
+        logLSPatchInfo();
+        
         var rootDetector = Unobfuscator.loadRootDetector(classLoader);
         for (var detector : rootDetector) {
             logDebug("Root", detector);
@@ -65,5 +75,11 @@ public class AntiWa extends Feature {
     @Override
     public String getPluginName() {
         return "AntiDetector";
+    }
+
+    @Override
+    protected boolean shouldHideInLSPatch() {
+        // This feature should be hidden in LSPatch as it requires system-level access
+        return true;
     }
 }

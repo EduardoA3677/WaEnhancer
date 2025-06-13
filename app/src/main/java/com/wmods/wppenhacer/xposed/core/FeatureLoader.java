@@ -169,7 +169,8 @@ public class FeatureLoader {
         if (LSPatchCompat.getCurrentMode() == LSPatchCompat.LSPatchMode.LSPATCH_MANAGER) {
             String[] limitedFeatures = {
                 "resource_hooks", // Limited in manager mode
-                "custom_themes" // Limited in manager mode
+                "custom_themes", // Limited in manager mode
+                "CustomView" // May have resource limitations in manager mode
             };
             
             for (String limitedFeature : limitedFeatures) {
@@ -179,7 +180,51 @@ public class FeatureLoader {
             }
         }
         
+        // Additional compatibility checks for specific features
+        if (LSPatchCompat.isLSPatchEnvironment()) {
+            switch (featureName) {
+                case "Others":
+                    // Some props may not work in LSPatch, but most functionality is available
+                    XposedBridge.log("Feature Others loaded with LSPatch adaptations");
+                    break;
+                case "ShowOnline":
+                    // May have presence service limitations
+                    if (!LSPatchCompat.isFeatureAvailable("PRESENCE_SERVICE")) {
+                        XposedBridge.log("Feature ShowOnline may have limited presence functionality in LSPatch");
+                    }
+                    break;
+            }
+        }
+        
         return true;
+    }
+
+    /**
+     * Initialize DexKit with LSPatch support
+     */
+    private static boolean initDexKitWithLSPatchSupport(String sourceDir) {
+        if (LSPatchCompat.isLSPatchEnvironment()) {
+            XposedBridge.log("Initializing DexKit with LSPatch compatibility");
+            
+            // Use LSPatch-compatible DexKit initialization
+            try {
+                io.luckypray.dexkit.DexKitBridge bridge = LSPatchDexKitCompat.initDexKit(sourceDir);
+                if (bridge != null) {
+                    // Initialize standard Unobfuscator with the LSPatch-compatible bridge
+                    return Unobfuscator.initWithPath(sourceDir);
+                } else {
+                    XposedBridge.log("LSPatch DexKit initialization failed, trying standard initialization");
+                    return Unobfuscator.initWithPath(sourceDir);
+                }
+            } catch (Exception e) {
+                XposedBridge.log("LSPatch DexKit initialization error: " + e.getMessage());
+                // Fallback to standard initialization
+                return Unobfuscator.initWithPath(sourceDir);
+            }
+        } else {
+            // Standard Xposed initialization
+            return Unobfuscator.initWithPath(sourceDir);
+        }
     }
 
     public static void start(@NonNull ClassLoader loader, @NonNull XSharedPreferences pref, String sourceDir) {
@@ -187,7 +232,7 @@ public class FeatureLoader {
         // Initialize LSPatch compatibility layer
         initializeLSPatchCompatibility(pref);
 
-        if (!Unobfuscator.initWithPath(sourceDir)) {
+        if (!initDexKitWithLSPatchSupport(sourceDir)) {
             XposedBridge.log("Can't init dexkit");
             return;
         }
@@ -537,7 +582,7 @@ public class FeatureLoader {
     /**
      * Performs LSPatch-safe hook initialization for a feature
      */
-    private static void doLSPatchSafeHook(Feature plugin) {
+    private static void doLSPatchSafeHook(Feature plugin) throws Throwable {
         try {
             // Set flag to indicate LSPatch mode for the feature
             if (plugin.prefs != null) {
@@ -558,7 +603,7 @@ public class FeatureLoader {
             // Apply hook with LSPatch optimizations
             plugin.doHook();
             
-        } catch (Exception e) {
+        } catch (Throwable e) {
             XposedBridge.log("LSPatch-safe hook failed for " + plugin.getClass().getSimpleName() + ": " + e.getMessage());
             throw e;
         }

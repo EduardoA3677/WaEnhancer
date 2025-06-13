@@ -1,6 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
 <PreferenceScreen xmlns:app="http://schemas.android.com/apk/res-auto">
 
+    <!-- LSPatch Compatibility Info -->
+    <PreferenceCategory
+        app:iconSpaceReserved="false"
+        app:title="@string/system_info">
+
+        <com.wmods.wppenhacer.preference.LSPatchInfoPreference
+            app:key="lspatch_info"
+            app:iconSpaceReserved="false"
+            app:title="@string/lspatch_compatibility" />
+
+    </PreferenceCategory>
+
     <Preference
         app:fragment="com.wmods.wppenhacer.ui.fragments.GeneralFragment$HomeGeneralPreference"
         app:iconSpaceReserved="false"

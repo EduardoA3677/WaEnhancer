@@ -127,6 +127,9 @@
             android:name="lspatch_min_version"
             android:value="0.6" />
         <meta-data
+            android:name="lspatch_max_version"
+            android:value="1.0" />
+        <meta-data
             android:name="lspatch_supports_embedded"
             android:value="true" />
         <meta-data
@@ -138,6 +141,18 @@
         <meta-data
             android:name="lspatch_resource_hooks"
             android:value="true" />
+        <meta-data
+            android:name="lspatch_system_server_hooks"
+            android:value="false" />
+        <meta-data
+            android:name="lspatch_bridge_service"
+            android:value="true" />
+        <meta-data
+            android:name="lspatch_xposed_api"
+            android:value="82" />
+        <meta-data
+            android:name="lspatch_feature_level"
+            android:value="2" />
 
         <receiver
             android:name=".receivers.WAFReceiver"
