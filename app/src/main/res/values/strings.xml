@@ -376,7 +376,6 @@
     
     <!-- LSPatch related strings -->
     <string name="lspatch_environment_detected">LSPatch Environment Detected</string>
-    <string name="lspatch_full_functionality">Full functionality available</string>
     <string name="classic_xposed_detected">Classic Xposed/LSPosed detected</string>
     <string name="features_hidden_lspatch">Some features have been hidden due to LSPatch limitations</string>
     <string name="enable_wa_enhancer_button">Enable Wa Enhancer Button</string>
