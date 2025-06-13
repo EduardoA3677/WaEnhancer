@@ -1,5 +1,3 @@
-// For format details, see https://aka.ms/devcontainer.json. For config options, see the README at:
-// https://github.com/microsoft/vscode-dev-containers/tree/v0.183.0/containers/docker-existing-dockerfile
 {
   "name": "codespaces",
   "image": "mcr.microsoft.com/devcontainers/base:jammy",
@@ -30,11 +28,14 @@
     "ghcr.io/duduribeiro/devcontainer-features/tmux:latest": {
       "version": "3.4"
     },
-    "ghcr.io/georgofenbeck/features/lazygit-linuxbinary:latest": {}
+    "ghcr.io/georgofenbeck/features/lazygit-linuxbinary:latest": {},
+    "ghcr.io/devcontainers-contrib/features/fzf:latest": {},
+    "ghcr.io/social-anthrax/eza-devcontainer/eza:0": {},
+    "ghcr.io/jungaretti/features/ripgrep:1": {}
   },
+  
   "customizations": {
     "vscode": {
-      // Set *default* container specific settings.json values on container create.
       "settings": {
         "eslint.alwaysShowStatus": true,
         "terminal.integrated.defaultProfile.linux": "zsh",
@@ -49,20 +50,14 @@
         "github.copilot.editor.enableCodeActions": true,
         "github.copilot.chat.agent.runTasks": true,
         "github.copilot.chat.search.semanticTextResults": true
-        
       },
-        // Add the IDs of extensions you want installed when the container is created.
       "extensions": [
-        // Global
         "tobiasalthoff.atom-material-theme",
         "editorconfig.editorconfig",
         "gruntfuggly.todo-tree",
         "eamodio.gitlens",
-        // Front
         "naumovs.color-highlight",
-        // Docker
         "ms-azuretools.vscode-docker",
-        "gruntfuggly.todo-tree",
         "mhutchie.git-graph",
         "ms-python.python",
         "ms-python.vscode-pylance",
@@ -78,7 +73,9 @@
       ]
     }
   },
+  
   "forwardPorts": [8888, 2222, 9090, 8080, 4433, 2121, 9000, 3333, 4444],
   "remoteUser": "vscode",
-  "postCreateCommand": "sudo apt update && sudo apt install -y software-properties-common && sudo add-apt-repository universe -y && sudo apt update && sudo apt install -y tree fonts-powerline fonts-firacode curl openjdk-17-jdk gradle wget unzip && wget https://dl.google.com/android/repository/commandlinetools-linux-6200805_latest.zip && mkdir -p $HOME/Android/Sdk && unzip commandlinetools-linux-6200805_latest.zip -d $HOME/Android/Sdk && export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64 && export ANDROID_HOME=$HOME/Android/Sdk && export PATH=$JAVA_HOME/bin:$ANDROID_HOME/emulator:$ANDROID_HOME/tools:$ANDROID_HOME/tools/bin:$ANDROID_HOME/platform-tools:$PATH && sdkmanager --sdk_root=${ANDROID_HOME} \"tools\" && sdkmanager --update && sdkmanager --list && sdkmanager \"build-tools;28.0.3\" \"platform-tools\" \"platforms;android-28\" \"tools\" && sdkmanager --licenses && echo \"export JAVA_HOME=$JAVA_HOME\" >> ~/.zshrc && echo \"export PATH=$JAVA_HOME/bin:$ANDROID_HOME/emulator:$ANDROID_HOME/tools:$ANDROID_HOME/tools/bin:$ANDROID_HOME/platform-tools:$PATH\" >> ~/.zshrc && source ~/.zshrc"
+  
+  "postCreateCommand": "sudo apt update && sudo apt install -y software-properties-common && sudo add-apt-repository universe -y && sudo apt update && sudo apt install -y tree fonts-powerline fonts-firacode curl wget unzip openjdk-17-jdk gradle && wget https://dl.google.com/android/repository/commandlinetools-linux-6200805_latest.zip && mkdir -p $HOME/Android/Sdk && unzip commandlinetools-linux-6200805_latest.zip -d $HOME/Android/Sdk && export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64 && export ANDROID_HOME=$HOME/Android/Sdk && export PATH=$JAVA_HOME/bin:$ANDROID_HOME/emulator:$ANDROID_HOME/tools:$ANDROID_HOME/tools/bin:$ANDROID_HOME/platform-tools:$PATH && sdkmanager --sdk_root=${ANDROID_HOME} \"tools\" && sdkmanager --update && sdkmanager --list && sdkmanager \"build-tools;28.0.3\" \"platform-tools\" \"platforms;android-28\" \"tools\" && sdkmanager --licenses && echo \"export JAVA_HOME=$JAVA_HOME\" >> ~/.zshrc && echo \"export PATH=$JAVA_HOME/bin:$ANDROID_HOME/emulator:$ANDROID_HOME/tools:$ANDROID_HOME/tools/bin:$ANDROID_HOME/platform-tools:$PATH\" >> ~/.zshrc && source ~/.zshrc"
 }
